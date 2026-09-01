@@ -97,19 +97,32 @@ Nothing is faked — every number on screen comes from a real database call.
 - 🤖 **Ask the AI Diligence Assistant** — icon button in the sidebar with live portfolio Q&A and comparisons
 - 📥 **Export pipeline to CSV** — 1-click button on Startups list to download your dataset into a spreadsheet
 
-<br/>
+## 🚀 Local Setup & Running Guide
 
-## 🚀 Getting it running
+### 📋 Prerequisites
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+
+### ⚡ 3-Step Quickstart
 
 ```bash
+# 1. Clone the repository
 git clone https://github.com/Mokshilxhah/Investly.git
 cd Investly
+
+# 2. Install all dependencies (root, server, client)
 npm run install:all
-npm run seed      # optional — adds sample startups so it's not empty
-npm run dev        # starts both frontend and backend together
+
+# 3. Seed database with 8 mature venture startups
+npm run seed
+
+# 4. Start full-stack development servers concurrently
+npm run dev
 ```
 
-Then open **`http://localhost:5173`** in your browser. That's it — no setup needed, it uses a built-in database by default.
+* **Frontend Client**: Open [http://localhost:5173](http://localhost:5173) in your browser.
+* **Backend API**: Running at [http://localhost:5000](http://localhost:5000) (Health Check: [http://localhost:5000/api/health](http://localhost:5000/api/health)).
+* **Database**: Automatically connects to local MongoDB (`mongodb://127.0.0.1:27017/startup_intelligence`) or seamlessly falls back to an embedded in-memory database with zero configuration.
 
 <br/>
 
