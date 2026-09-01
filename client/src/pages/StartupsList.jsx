@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   RotateCcw,
   FileSpreadsheet,
+  Download,
   Check,
 } from 'lucide-react';
 import startupService from '../services/startupService';
@@ -123,6 +124,88 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
     setSortBy('createdAt-desc');
   };
 
+  // 1-Click Export to CSV
+  const handleExportCSV = () => {
+    if (!startups || startups.length === 0) {
+      showToast('No startups available to export', 'error');
+      return;
+    }
+
+    try {
+      const headers = [
+        'Company Name',
+        'Industry',
+        'Financing Stage',
+        'Pipeline Stage',
+        'Founder Name',
+        'Founder Background',
+        'Location',
+        'Website',
+        'Founder Score',
+        'Market Score',
+        'Business Model Score',
+        'Growth Score',
+        'Competition Score',
+        'Risk Score',
+        'Overall Deal Score',
+        'Recommendation',
+        'Decision Status',
+        'Decision Comment',
+        'Decided By',
+        'Decided At',
+        'Description',
+      ];
+
+      const escapeCSV = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const rows = startups.map((s) => [
+        escapeCSV(s.companyName),
+        escapeCSV(s.industry),
+        escapeCSV(s.stage),
+        escapeCSV(s.pipelineStage || 'Discovered'),
+        escapeCSV(s.founder?.name || ''),
+        escapeCSV(s.founder?.background || ''),
+        escapeCSV(s.location || ''),
+        escapeCSV(s.website || ''),
+        escapeCSV(s.evaluation?.overallScore !== undefined ? s.evaluation.overallScore : ''),
+        escapeCSV(s.analysis?.marketScore !== undefined ? s.analysis.marketScore : ''),
+        escapeCSV(s.analysis?.businessModelScore !== undefined ? s.analysis.businessModelScore : ''),
+        escapeCSV(s.analysis?.growthScore !== undefined ? s.analysis.growthScore : ''),
+        escapeCSV(s.analysis?.competitionScore !== undefined ? s.analysis.competitionScore : ''),
+        escapeCSV(s.analysis?.riskScore !== undefined ? s.analysis.riskScore : ''),
+        escapeCSV(s.scorecard?.overallInvestmentScore !== undefined ? s.scorecard.overallInvestmentScore : ''),
+        escapeCSV(s.scorecard?.systemRecommendation || 'PENDING'),
+        escapeCSV(s.decision?.status || 'UNDER_EVALUATION'),
+        escapeCSV(s.decision?.comment || ''),
+        escapeCSV(s.decision?.decidedBy || ''),
+        escapeCSV(s.decision?.decidedAt ? new Date(s.decision.decidedAt).toISOString().split('T')[0] : ''),
+        escapeCSV(s.description || ''),
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const filename = `investly-pipeline-${new Date().toISOString().split('T')[0]}.csv`;
+
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      showToast(`Exported ${startups.length} startups to CSV!`);
+    } catch (err) {
+      console.error('Error exporting CSV:', err);
+      showToast('Failed to export CSV file.', 'error');
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 text-slate-900 w-full min-w-0">
       {/* Toast Notification Banner */}
@@ -143,7 +226,7 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
         </div>
       )}
 
-      {/* 🏷️ 1. PAGE HEADER: Title, Import Excel & Add Startup Actions */}
+      {/* 🏷️ 1. PAGE HEADER: Title, Import Excel, Export CSV & Add Startup Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight">
@@ -151,7 +234,7 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start sm:self-auto">
+        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
           {/* Direct Excel / CSV Upload Button */}
           <button
             type="button"
@@ -159,7 +242,19 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold font-display text-slate-800 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-            <span>Import Excel / CSV</span>
+            <span>Import CSV</span>
+          </button>
+
+          {/* Export to CSV Button */}
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            disabled={startups.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold font-display text-slate-800 bg-white hover:bg-slate-100 border border-slate-200/80 shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+            title="Export filtered startup list to CSV"
+          >
+            <Download className="w-4 h-4 text-slate-700" />
+            <span>Export CSV</span>
           </button>
 
           {/* Add Startup Button (Opens 2-Option Choice Modal) */}

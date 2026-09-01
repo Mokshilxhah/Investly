@@ -7,6 +7,7 @@ const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const startupRoutes = require('./routes/startupRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/startups', startupRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Error Handling Middleware
 app.use(notFound);

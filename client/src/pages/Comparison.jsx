@@ -40,6 +40,14 @@ export const Comparison = () => {
   const [selectedIds, setSelectedIds] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Filter ONLY startups with decision category INVEST or WATCHLIST
+  const eligibleStartups = useMemo(() => {
+    return allStartups.filter((s) => {
+      const status = s.decision?.status;
+      return status === 'INVEST' || status === 'WATCHLIST';
+    });
+  }, [allStartups]);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -48,22 +56,23 @@ export const Comparison = () => {
         const list = data || [];
         setAllStartups(list);
 
+        // Filter list to only INVEST and WATCHLIST
+        const filteredList = list.filter(
+          (s) => s.decision?.status === 'INVEST' || s.decision?.status === 'WATCHLIST'
+        );
+
         const queryIds = searchParams.get('ids');
         if (queryIds) {
-          const ids = queryIds.split(',').filter(Boolean);
-          setSelectedIds(ids.slice(0, 4));
-        } else if (list.length >= 2) {
-          // Pre-select top 2 evaluated startups or first 2
-          const evaluated = list.filter(
-            (s) =>
-              (s.scorecard?.overallInvestmentScore && s.scorecard.overallInvestmentScore > 0) ||
-              (s.evaluation?.overallScore && s.evaluation.overallScore > 0)
-          );
-          if (evaluated.length >= 2) {
-            setSelectedIds([evaluated[0]._id, evaluated[1]._id]);
-          } else if (list.length > 0) {
-            setSelectedIds(list.slice(0, Math.min(2, list.length)).map((s) => s._id));
-          }
+          const ids = queryIds
+            .split(',')
+            .filter((id) => filteredList.some((s) => s._id === id))
+            .slice(0, 3); // Max 3 startups
+          setSelectedIds(ids);
+        } else if (filteredList.length >= 2) {
+          // Pre-select top 2 from eligible list
+          setSelectedIds([filteredList[0]._id, filteredList[1]._id]);
+        } else if (filteredList.length > 0) {
+          setSelectedIds([filteredList[0]._id]);
         }
       } catch (err) {
         console.error('Error fetching startups for comparison:', err);
@@ -78,7 +87,7 @@ export const Comparison = () => {
   const handleDropdownSelect = (id) => {
     if (!id) return;
     if (!selectedIds.includes(id)) {
-      if (selectedIds.length >= 4) return;
+      if (selectedIds.length >= 3) return; // Strict max 3 limit
       const updated = [...selectedIds, id];
       setSelectedIds(updated);
       setSearchParams({ ids: updated.join(',') });
@@ -236,39 +245,80 @@ export const Comparison = () => {
       });
   }, [allStartups, selectedIds]);
 
-  // Find best performers across dimensions
-  const highlights = useMemo(() => {
+  // Holistic Multi-Pillar All-Rounder Analysis Engine (evaluates balance, floor strength, and low risk beyond just raw score)
+  const allRounderAnalysis = useMemo(() => {
     if (comparedStartups.length < 2) return null;
-    const maxOverall = Math.max(...comparedStartups.map((s) => s.overallScore || 0));
-    const maxFounder = Math.max(...comparedStartups.map((s) => s.founderScore || 0));
-    const maxMarket = Math.max(...comparedStartups.map((s) => s.marketScore || 0));
-    const maxGrowth = Math.max(...comparedStartups.map((s) => s.growthScore || 0));
 
-    return {
-      topOverallId: maxOverall > 0 ? comparedStartups.find((s) => s.overallScore === maxOverall)?._id : null,
-      topFounderId: maxFounder > 0 ? comparedStartups.find((s) => s.founderScore === maxFounder)?._id : null,
-      topMarketId: maxMarket > 0 ? comparedStartups.find((s) => s.marketScore === maxMarket)?._id : null,
-      topGrowthId: maxGrowth > 0 ? comparedStartups.find((s) => s.growthScore === maxGrowth)?._id : null,
-    };
+    const evaluatedList = comparedStartups.map((s) => {
+      const founder = s.founderScore || 0;
+      const market = s.marketScore || 0;
+      const growth = s.growthScore || 0;
+      const model = s.businessModelScore || 0;
+      const moat = s.competitionScore || 0;
+      const riskMitigation = Math.max(0, 10 - (s.riskScore || 0));
+
+      const pillars = [
+        { label: 'Founder & Team', score: founder, weight: 0.30 },
+        { label: 'Market & TAM', score: market, weight: 0.20 },
+        { label: 'Growth Traction', score: growth, weight: 0.20 },
+        { label: 'Business Model', score: model, weight: 0.15 },
+        { label: 'Defensible Moat', score: moat, weight: 0.10 },
+        { label: 'Risk Mitigation', score: riskMitigation, weight: 0.05 },
+      ];
+
+      const scoresArray = [founder, market, growth, model, moat, riskMitigation];
+      const avgScore = scoresArray.reduce((a, b) => a + b, 0) / scoresArray.length;
+      const minPillar = Math.min(...scoresArray);
+      
+      // Standard deviation / balance measure
+      const variance = scoresArray.reduce((acc, val) => acc + Math.pow(val - avgScore, 2), 0) / scoresArray.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Composite All-Rounder Balance Score:
+      // High score + high consistency (low variance) + strong minimum floor (no fatal flaws)
+      const balanceIndex = (s.overallScore * 0.40) + (avgScore * 0.30) + (minPillar * 0.25) - (stdDev * 0.15);
+
+      // Qualitative highlights
+      const strengths = [];
+      if (founder >= 8.5) strengths.push('proven founder pedigree');
+      else if (founder >= 7.0) strengths.push('strong founder execution');
+
+      if (market >= 8.0) strengths.push('large expanding TAM');
+      if (growth >= 8.0) strengths.push('high revenue velocity');
+      if (model >= 8.0) strengths.push('high software gross margins');
+      if (moat >= 8.0) strengths.push('defensible technical moat');
+      if (s.riskScore <= 3.0) strengths.push('minimal execution risk');
+
+      let detailedReason = '';
+      if (minPillar >= 7.0) {
+        detailedReason = `Complete all-around strength with no weak dimensions (lowest individual pillar is ${minPillar.toFixed(1)}/10). Balances ${strengths.slice(0, 3).join(', ')} with an institutional risk profile.`;
+      } else if (s.decisionStatus === 'INVEST') {
+        detailedReason = `Highest overall committee conviction deal featuring ${strengths.slice(0, 3).join(', ')} and sustainable capital efficiency.`;
+      } else {
+        detailedReason = `Superior risk-adjusted opportunity across compared companies with well-balanced ${strengths.slice(0, 2).join(' and ')}.`;
+      }
+
+      return {
+        startup: s,
+        balanceIndex,
+        minPillar,
+        stdDev,
+        pillars,
+        strengths,
+        detailedReason,
+      };
+    });
+
+    evaluatedList.sort((a, b) => b.balanceIndex - a.balanceIndex);
+    return evaluatedList[0];
   }, [comparedStartups]);
-
-  // Filter ONLY eligible startups for comparison (INVEST / WATCHLIST & evaluated deals)
-  const eligibleStartups = allStartups.filter((s) => {
-    const isInvestOrWatchlist =
-      s.decision?.status === 'INVEST' || s.decision?.status === 'WATCHLIST';
-    const isEvaluated = Boolean(
-      (s.scorecard?.overallInvestmentScore && s.scorecard.overallInvestmentScore > 0) ||
-      (s.evaluation?.overallScore && s.evaluation.overallScore > 0)
-    );
-    return isInvestOrWatchlist || isEvaluated;
-  });
 
   const availableToAdd = eligibleStartups.filter((s) => !selectedIds.includes(s._id));
 
   if (loading) return <PageLoader />;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 text-slate-900 w-full min-w-0 pb-16 font-sans">
+    <div className="max-w-7xl mx-auto space-y-5 text-slate-900 w-full min-w-0 pb-16 font-sans">
       {/* 🏷️ Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-[24px] p-4 px-5 shadow-xs border border-slate-200">
         <div className="flex items-center gap-3">
@@ -279,6 +329,9 @@ export const Comparison = () => {
             <h1 className="text-lg sm:text-xl font-black font-display text-slate-900 tracking-tight">
               Deal Comparison Matrix
             </h1>
+            <p className="text-[11px] font-semibold text-slate-500 font-display">
+              Side-by-side analysis of Invest & Watchlist deals (Max 3)
+            </p>
           </div>
         </div>
 
@@ -288,19 +341,19 @@ export const Comparison = () => {
           <select
             value=""
             onChange={(e) => handleDropdownSelect(e.target.value)}
-            disabled={selectedIds.length >= 4 || availableToAdd.length === 0}
+            disabled={selectedIds.length >= 3 || availableToAdd.length === 0}
             className="bg-[#191919] hover:bg-slate-900 border border-slate-900 text-[#9df5a9] text-xs font-bold font-display rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#9df5a9] cursor-pointer disabled:opacity-50 shadow-xs"
           >
             <option value="" disabled className="bg-[#191919] text-slate-400">
-              {selectedIds.length >= 4
-                ? 'Max 4 Startups Compared'
+              {selectedIds.length >= 3
+                ? 'Max 3 Startups Compared'
                 : availableToAdd.length === 0
-                ? 'No More Eligible Deals Available'
-                : '+ Select Eligible Startup to Compare...'}
+                ? 'No More Invest/Watchlist Deals'
+                : '+ Add Deal to Compare (Max 3)...'}
             </option>
             {availableToAdd.map((s) => (
               <option key={s._id} value={s._id} className="bg-white text-slate-900 font-medium">
-                {s.companyName} ({s.decision?.status || (s.scorecard?.overallInvestmentScore ? `${s.scorecard.overallInvestmentScore.toFixed(1)}/10` : 'Evaluated')})
+                {s.companyName} ({s.decision?.status || 'Evaluated'} • {s.scorecard?.overallInvestmentScore ? `${s.scorecard.overallInvestmentScore.toFixed(1)}/10` : s.stage})
               </option>
             ))}
           </select>
@@ -336,49 +389,43 @@ export const Comparison = () => {
               No Startups Selected for Comparison
             </h3>
             <p className="text-xs text-slate-500 font-display font-medium max-w-sm mx-auto">
-              Select 2 to 4 startups from the dropdown above to compare their live founder pedigree, commercial unit economics, and deal scores side by side.
+              Select 2 to 3 deals from your Invest or Watchlist pipeline using the dropdown above to evaluate live founder pedigree, commercial unit economics, and deal conviction side by side.
             </p>
           </div>
         </div>
       ) : (
-        /* 📊 Dynamic Side-by-Side Grid */
+        /* 📊 Dynamic Side-by-Side Grid (Max 3 Startups) */
         <div
-          className={`grid grid-cols-1 md:grid-cols-2 ${
-            comparedStartups.length === 3
-              ? 'lg:grid-cols-3'
-              : comparedStartups.length >= 4
-              ? 'lg:grid-cols-4'
-              : 'lg:grid-cols-2'
+          className={`grid grid-cols-1 ${
+            comparedStartups.length === 2
+              ? 'md:grid-cols-2'
+              : 'md:grid-cols-2 lg:grid-cols-3'
           } gap-4 items-stretch`}
         >
           {comparedStartups.map((s) => {
-            const isTopOverall = highlights?.topOverallId === s._id && s.overallScore > 0;
-            const isTopFounder = highlights?.topFounderId === s._id && s.founderScore > 0;
-            const isTopMarket = highlights?.topMarketId === s._id && s.marketScore > 0;
+            const isTopAllRounder = allRounderAnalysis?.startup?._id === s._id;
 
             const decisionBadgeClass =
               s.decisionStatus === 'INVEST'
                 ? 'bg-[#9df5a9] text-slate-950 border-emerald-300'
                 : s.decisionStatus === 'WATCHLIST'
                 ? 'bg-amber-100 text-amber-900 border-amber-300'
-                : s.decisionStatus === 'REJECT'
-                ? 'bg-rose-100 text-rose-900 border-rose-300'
                 : 'bg-slate-100 text-slate-800 border-slate-300';
 
             return (
               <div
                 key={s._id}
                 className={`bg-white rounded-[26px] p-5 shadow-xs border flex flex-col justify-between space-y-4 relative transition-all ${
-                  isTopOverall
+                  isTopAllRounder
                     ? 'border-emerald-400 ring-2 ring-emerald-300/40'
                     : 'border-slate-200/90'
                 }`}
               >
                 {/* Winner Highlight Ribbon */}
-                {isTopOverall && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#191919] text-[#9df5a9] text-[10px] font-black font-display flex items-center gap-1 shadow-xs border border-emerald-500/40">
+                {isTopAllRounder && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#191919] text-[#9df5a9] text-[10px] font-black font-display flex items-center gap-1 shadow-xs border border-emerald-500/40 whitespace-nowrap">
                     <Trophy className="w-3 h-3 text-[#9df5a9]" />
-                    <span>Top Deal Score</span>
+                    <span>Top All-Rounder Deal</span>
                   </div>
                 )}
 
@@ -578,6 +625,57 @@ export const Comparison = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* 🌟 4. Fast Executive Decision Verdict Banner */}
+      {allRounderAnalysis && (
+        <div className="bg-[#191919] text-white rounded-[22px] p-4 sm:p-5 shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#9df5a9] text-[#191919] flex items-center justify-center font-black shadow-xs flex-shrink-0 mt-0.5 sm:mt-0">
+              <Trophy className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black font-display uppercase tracking-widest text-[#9df5a9]">
+                  Committee Top Pick
+                </span>
+                <span className="bg-white/10 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
+                  Complete All-Rounder
+                </span>
+              </div>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <h2 className="text-base sm:text-lg font-black font-display text-white truncate">
+                  {allRounderAnalysis.startup.companyName}
+                </h2>
+                <span className="text-xs text-slate-400 font-medium">
+                  ({allRounderAnalysis.startup.industry} • {allRounderAnalysis.startup.stage})
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 font-medium leading-relaxed mt-1 line-clamp-2">
+                {allRounderAnalysis.detailedReason}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-shrink-0 self-end md:self-auto">
+            <div className="bg-white/10 px-3.5 py-1.5 rounded-xl border border-white/10 text-center">
+              <div className="text-[9px] font-bold text-slate-400 font-display uppercase tracking-wider">
+                Deal Score
+              </div>
+              <div className="text-sm font-black font-display text-[#9df5a9]">
+                {allRounderAnalysis.startup.overallScore > 0 ? `${allRounderAnalysis.startup.overallScore.toFixed(1)}/10` : '—'}
+              </div>
+            </div>
+
+            <Link
+              to={`/evaluation?id=${allRounderAnalysis.startup._id}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black font-display text-slate-950 bg-[#9df5a9] hover:bg-[#8ee59a] transition-all shadow-xs hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
+            >
+              <span>Open Diligence</span>
+              <ArrowLeft className="w-3.5 h-3.5 rotate-180" />
+            </Link>
+          </div>
         </div>
       )}
     </div>

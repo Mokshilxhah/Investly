@@ -54,42 +54,66 @@ const CORE_5_QUALITIES = [
   { key: 'teamStrength', label: 'Leadership' },
 ];
 
-// Simple, Fair Dropdown Options
+// Simple, Fair Dropdown Options with full score tiers
 const MARKET_DROPDOWN_OPTIONS = [
   { label: 'Select market size...', score: '' },
-  { label: 'Just starting / New idea', score: 5.0 },
-  { label: 'Small niche market', score: 6.5 },
-  { label: 'Good sized market', score: 8.0 },
-  { label: 'Large global market', score: 9.5 },
-  { label: 'Huge industry shift', score: 10.0 },
+  { label: 'Early unproven / Emerging TAM (5.0)', score: 5.0 },
+  { label: 'Small specialized niche (6.0)', score: 6.0 },
+  { label: 'Moderate addressable market (7.0)', score: 7.0 },
+  { label: 'Large attractive market (8.0)', score: 8.0 },
+  { label: 'Massive $10B+ global market (9.0)', score: 9.0 },
+  { label: 'Dominant secular industry shift (10.0)', score: 10.0 },
 ];
 
 const MODEL_DROPDOWN_OPTIONS = [
   { label: 'Select business model...', score: '' },
-  { label: 'Testing pricing / Early', score: 5.0 },
-  { label: 'Standard margins', score: 6.5 },
-  { label: 'High profit margins', score: 8.0 },
-  { label: 'Very high software margins', score: 9.5 },
-  { label: 'Top tier software economics', score: 10.0 },
+  { label: 'Early pricing validation (5.0)', score: 5.0 },
+  { label: 'Moderate gross margins (6.0)', score: 6.0 },
+  { label: 'Predictable recurring model (7.0)', score: 7.0 },
+  { label: 'High software gross margins (8.0)', score: 8.0 },
+  { label: 'Top-tier enterprise SaaS LTV/CAC (9.0)', score: 9.0 },
+  { label: 'Best-in-class venture unit economics (10.0)', score: 10.0 },
 ];
 
 const GROWTH_DROPDOWN_OPTIONS = [
   { label: 'Select growth stage...', score: '' },
-  { label: 'Day 0 / Working on product', score: 5.0 },
-  { label: 'First users / Beta testing', score: 6.5 },
-  { label: 'Early paying customers', score: 8.0 },
-  { label: 'Growing fast month-over-month', score: 9.5 },
-  { label: 'Rapid expansion / Breakout', score: 10.0 },
+  { label: 'Prototype / Day 0 (5.0)', score: 5.0 },
+  { label: 'Early beta user traction (6.0)', score: 6.0 },
+  { label: 'Consistent MoM customer acquisition (7.0)', score: 7.0 },
+  { label: 'Strong ARR expansion velocity (8.0)', score: 8.0 },
+  { label: 'Rapid hyper-growth & 130%+ NRR (9.0)', score: 9.0 },
+  { label: 'Breakout market category leader (10.0)', score: 10.0 },
 ];
 
 const MOAT_DROPDOWN_OPTIONS = [
   { label: 'Select moat & defense...', score: '' },
-  { label: 'Early stage / Finding advantage', score: 5.0 },
-  { label: 'Fast team & good brand', score: 6.5 },
-  { label: 'Hard to copy / Unique product', score: 8.0 },
-  { label: 'Strong tech & user network', score: 9.5 },
-  { label: 'Dominant market leader', score: 10.0 },
+  { label: 'Early advantage / Execution speed (5.0)', score: 5.0 },
+  { label: 'Differentiated product experience (6.0)', score: 6.0 },
+  { label: 'High switching costs & workflow stickiness (7.0)', score: 7.0 },
+  { label: 'Proprietary IP & enterprise integration moat (8.0)', score: 8.0 },
+  { label: 'Strong data flywheel & network effects (9.0)', score: 9.0 },
+  { label: 'Monopolistic distribution & platform lock-in (10.0)', score: 10.0 },
 ];
+
+// Helper to always highlight the matching or closest tier in the dropdown
+const getMatchingDropdownValue = (score, options) => {
+  if (score === undefined || score === null || score === '' || Number(score) === 0) return '';
+  const num = Number(score);
+  const exact = options.find((o) => o.score !== '' && Math.abs(Number(o.score) - num) < 0.01);
+  if (exact) return exact.score;
+  const valid = options.filter((o) => o.score !== '');
+  if (valid.length === 0) return '';
+  let closest = valid[0];
+  let minDiff = Math.abs(Number(closest.score) - num);
+  for (const opt of valid) {
+    const diff = Math.abs(Number(opt.score) - num);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = opt;
+    }
+  }
+  return closest.score;
+};
 
 export const Evaluation = () => {
   const { id: paramId } = useParams();
@@ -214,7 +238,7 @@ export const Evaluation = () => {
     fetchStartups();
   }, [startupId]);
 
-  // Clean data loader
+  // Clean data loader: Always prioritizes live database records
   const loadCleanStartupData = (startup) => {
     if (!startup) return;
 
@@ -223,50 +247,39 @@ export const Evaluation = () => {
       setDecisionComment(startup.decision.comment || '');
     }
 
-    try {
-      const localData = localStorage.getItem(`eval_studio_${startup._id}`);
-      if (localData) {
-        const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed.roundsList)) setRoundsList(parsed.roundsList);
-        else setRoundsList([]);
+    const hasDbFounder = Boolean(
+      startup.evaluation?.overallScore !== undefined &&
+      startup.evaluation?.overallScore !== null &&
+      startup.evaluation.overallScore > 0
+    );
 
-        if (Array.isArray(parsed.qualitiesTodoList)) setQualitiesTodoList(parsed.qualitiesTodoList);
-        else setQualitiesTodoList(INITIAL_QUALITIES_TODO.map((t) => ({ ...t, done: false })));
+    const hasDbAnalysis = Boolean(
+      startup.analysis?.marketScore !== undefined &&
+      startup.analysis?.marketScore !== null &&
+      startup.analysis.marketScore > 0
+    );
 
-        if (parsed.starRatings) setStarRatings(parsed.starRatings);
-        else setStarRatings({ domainExpertise: 0, execution: 0, vision: 0, technicalMastery: 0, teamStrength: 0 });
+    // 1. Resolve Star Ratings (from MongoDB or default)
+    const exp = startup.evaluation?.technicalMastery || startup.evaluation?.experience || 0;
+    const initialStars = {
+      domainExpertise: startup.evaluation?.domainExpertise ? Math.max(1, Math.min(5, Math.round(startup.evaluation.domainExpertise / 2))) : 0,
+      execution: startup.evaluation?.execution ? Math.max(1, Math.min(5, Math.round(startup.evaluation.execution / 2))) : 0,
+      vision: startup.evaluation?.vision ? Math.max(1, Math.min(5, Math.round(startup.evaluation.vision / 2))) : 0,
+      technicalMastery: exp ? Math.max(1, Math.min(5, Math.round(exp / 2))) : 0,
+      teamStrength: startup.evaluation?.teamStrength ? Math.max(1, Math.min(5, Math.round(startup.evaluation.teamStrength / 2))) : 0,
+    };
 
-        setMeetingNotes(parsed.meetingNotes || '');
-
-        if (parsed.analyticsScores) setAnalyticsScores(parsed.analyticsScores);
-        if (parsed.analyticsData) setAnalyticsData(parsed.analyticsData);
-        if (parsed.riskCategories) setRiskCategories(parsed.riskCategories);
-        return;
-      }
-    } catch (e) {
-      console.warn('Local storage read error', e);
-    }
-
-    setStarRatings({
-      domainExpertise: startup.evaluation?.domainExpertise ? Math.round(startup.evaluation.domainExpertise / 2) : 0,
-      execution: startup.evaluation?.execution ? Math.round(startup.evaluation.execution / 2) : 0,
-      vision: startup.evaluation?.vision ? Math.round(startup.evaluation.vision / 2) : 0,
-      technicalMastery: startup.evaluation?.experience ? Math.round(startup.evaluation.experience / 2) : 0,
-      teamStrength: startup.evaluation?.teamStrength ? Math.round(startup.evaluation.teamStrength / 2) : 0,
-    });
-    setRoundsList([]);
-    setQualitiesTodoList(INITIAL_QUALITIES_TODO.map((t) => ({ ...t, done: false })));
-    setMeetingNotes(startup.evaluation?.meetingNotes || '');
-
-    setAnalyticsScores({
+    // 2. Resolve Analytics Scores (from MongoDB or default)
+    const initialAnalyticsScores = {
       marketScore: startup.analysis?.marketScore || 0,
       businessModelScore: startup.analysis?.businessModelScore || 0,
       growthScore: startup.analysis?.growthScore || 0,
       competitionScore: startup.analysis?.competitionScore || 0,
-      riskScore: startup.analysis?.riskScore !== undefined && startup.analysis?.riskScore !== null ? startup.analysis.riskScore : 1.0,
-    });
+      riskScore: startup.analysis?.riskScore !== undefined && startup.analysis?.riskScore !== null ? startup.analysis.riskScore : (hasDbAnalysis ? 2.0 : 0),
+    };
 
-    setAnalyticsData({
+    // 3. Resolve Text Data
+    const initialAnalyticsData = {
       marketOpportunity: startup.analysis?.marketOpportunity || '',
       businessModel: startup.analysis?.businessModel || '',
       revenue: startup.analysis?.revenue || '',
@@ -274,17 +287,61 @@ export const Evaluation = () => {
       competitiveLandscape: startup.analysis?.competitiveLandscape || '',
       keyRisks: startup.analysis?.keyRisks || '',
       investmentThesis: startup.analysis?.investmentThesis || startup.decision?.comment || '',
-    });
+    };
 
-    setRiskCategories(
-      startup.analysis?.riskCategories || {
-        founderRisk: 'LOW',
-        marketRisk: 'LOW',
-        executionRisk: 'LOW',
-        financialRisk: 'LOW',
-        competitiveRisk: 'LOW',
+    // 4. Resolve Risk Categories
+    const initialRiskCategories = startup.analysis?.riskCategories || {
+      founderRisk: startup.analysis?.riskScore && startup.analysis.riskScore > 6 ? 'HIGH' : startup.analysis?.riskScore && startup.analysis.riskScore > 3 ? 'MEDIUM' : 'LOW',
+      marketRisk: 'LOW',
+      executionRisk: 'LOW',
+      financialRisk: 'LOW',
+      competitiveRisk: 'LOW',
+    };
+
+    // 5. Resolve Meeting Notes & Checklist
+    const initialMeetingNotes = startup.founder?.background || startup.evaluation?.meetingNotes || '';
+    const initialChecklist = INITIAL_QUALITIES_TODO.map((t) => ({
+      ...t,
+      done: hasDbFounder ? (startup.evaluation.overallScore >= 7.0) : false,
+    }));
+
+    // Check if user has active session adjustments in local storage
+    try {
+      const localData = localStorage.getItem(`eval_studio_${startup._id}`);
+      if (localData) {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed.roundsList)) setRoundsList(parsed.roundsList);
+        else setRoundsList([]);
+
+        if (Array.isArray(parsed.qualitiesTodoList) && parsed.qualitiesTodoList.some(q => q.done)) {
+          setQualitiesTodoList(parsed.qualitiesTodoList);
+        } else {
+          setQualitiesTodoList(initialChecklist);
+        }
+
+        // If local storage has valid ratings, use them; otherwise fallback to DB
+        const hasLocalStars = parsed.starRatings && Object.values(parsed.starRatings).some(v => v > 0);
+        setStarRatings(hasLocalStars ? parsed.starRatings : initialStars);
+
+        setMeetingNotes(parsed.meetingNotes || initialMeetingNotes);
+
+        const hasLocalAnalytics = parsed.analyticsScores && Object.values(parsed.analyticsScores).some(v => v > 0);
+        setAnalyticsScores(hasLocalAnalytics ? parsed.analyticsScores : initialAnalyticsScores);
+        setAnalyticsData(parsed.analyticsData || initialAnalyticsData);
+        setRiskCategories(parsed.riskCategories || initialRiskCategories);
+        return;
       }
-    );
+    } catch (e) {
+      console.warn('Local storage read error', e);
+    }
+
+    setStarRatings(initialStars);
+    setRoundsList([]);
+    setQualitiesTodoList(initialChecklist);
+    setMeetingNotes(initialMeetingNotes);
+    setAnalyticsScores(initialAnalyticsScores);
+    setAnalyticsData(initialAnalyticsData);
+    setRiskCategories(initialRiskCategories);
   };
 
   const handleSelectStartup = (id) => {
@@ -393,13 +450,14 @@ export const Evaluation = () => {
   }, [starRatings, hasAnyStarsRated]);
 
   const compositeFounderScore = useMemo(() => {
-    if (avgStarScoreOutOf10 === null && avgRoundScore === null) return null;
     if (avgStarScoreOutOf10 !== null && avgRoundScore !== null) {
       return (avgStarScoreOutOf10 * 0.5) + (avgRoundScore * 0.5);
     }
+    if (avgRoundScore !== null) return avgRoundScore;
+    if (selectedStartup?.evaluation?.overallScore) return selectedStartup.evaluation.overallScore;
     if (avgStarScoreOutOf10 !== null) return avgStarScoreOutOf10;
-    return avgRoundScore;
-  }, [avgStarScoreOutOf10, avgRoundScore]);
+    return null;
+  }, [avgStarScoreOutOf10, avgRoundScore, selectedStartup]);
 
   // Qualities Checklist
   const handleToggleTodo = (todoId) => {
@@ -1233,7 +1291,7 @@ export const Evaluation = () => {
 
               <div className="sm:col-span-4 min-w-0">
                 <select
-                  value={analyticsScores.marketScore || ''}
+                  value={getMatchingDropdownValue(analyticsScores.marketScore, MARKET_DROPDOWN_OPTIONS)}
                   onChange={(e) => handleScoreChange('marketScore', parseFloat(e.target.value) || 0)}
                   className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 text-xs font-bold font-display text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#9df5a9] cursor-pointer"
                 >
@@ -1287,7 +1345,7 @@ export const Evaluation = () => {
 
               <div className="sm:col-span-4 min-w-0">
                 <select
-                  value={analyticsScores.businessModelScore || ''}
+                  value={getMatchingDropdownValue(analyticsScores.businessModelScore, MODEL_DROPDOWN_OPTIONS)}
                   onChange={(e) => handleScoreChange('businessModelScore', parseFloat(e.target.value) || 0)}
                   className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 text-xs font-bold font-display text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#9df5a9] cursor-pointer"
                 >
@@ -1341,7 +1399,7 @@ export const Evaluation = () => {
 
               <div className="sm:col-span-4 min-w-0">
                 <select
-                  value={analyticsScores.growthScore || ''}
+                  value={getMatchingDropdownValue(analyticsScores.growthScore, GROWTH_DROPDOWN_OPTIONS)}
                   onChange={(e) => handleScoreChange('growthScore', parseFloat(e.target.value) || 0)}
                   className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 text-xs font-bold font-display text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#9df5a9] cursor-pointer"
                 >
@@ -1402,7 +1460,7 @@ export const Evaluation = () => {
 
               <div className="sm:col-span-4 min-w-0">
                 <select
-                  value={analyticsScores.competitionScore || ''}
+                  value={getMatchingDropdownValue(analyticsScores.competitionScore, MOAT_DROPDOWN_OPTIONS)}
                   onChange={(e) => handleScoreChange('competitionScore', parseFloat(e.target.value) || 0)}
                   className="w-full bg-white border border-slate-200/90 rounded-xl px-2.5 py-1.5 text-xs font-bold font-display text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#9df5a9] cursor-pointer"
                 >

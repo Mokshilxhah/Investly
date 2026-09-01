@@ -7,6 +7,7 @@ import {
   Plus,
   TrendingUp,
   Target,
+  Bot,
 } from 'lucide-react';
 
 export const Sidebar = ({ onOpenAddModal, stats = {} }) => {
@@ -108,6 +109,29 @@ export const Sidebar = ({ onOpenAddModal, stats = {} }) => {
                 </NavLink>
               );
             })}
+          </div>
+        </div>
+
+        {/* 🤖 End of Sidebar: Animated Circling Robot AI Assistant (No Text) */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-center">
+          <div className="relative flex items-center justify-center group">
+            {/* Continuously Circling / Rotating Glow Ring */}
+            <div className="absolute -inset-1.5 rounded-2xl bg-gradient-to-r from-[#9df5a9] via-emerald-400 to-[#10b981] opacity-75 blur-xs group-hover:opacity-100 animate-spin [animation-duration:3s]" />
+            
+            {/* Floating Pulse Halo */}
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-tr from-emerald-500 to-[#9df5a9] opacity-40 animate-pulse" />
+
+            {/* The Robot Button (No Text) */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('toggle-ai-copilot'))}
+              className="relative w-12 h-12 rounded-2xl bg-[#191919] hover:bg-slate-900 text-[#9df5a9] flex items-center justify-center shadow-md transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+              title="AI Diligence Assistant"
+            >
+              <Bot className="w-6 h-6 stroke-[2.2] group-hover:rotate-12 transition-transform" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#9df5a9] ring-2 ring-[#191919] animate-ping" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#9df5a9] ring-2 ring-[#191919]" />
+            </button>
           </div>
         </div>
       </div>

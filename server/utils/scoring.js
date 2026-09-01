@@ -33,6 +33,7 @@ const calculateFounderScore = (evalData = {}) => {
 
 /**
  * Calculate the overall investment score from weighted sub-scores.
+ * Formula: 30% Founder + 20% Market TAM + 20% Growth & Traction + 15% Business Model + 10% Moat + 5% Risk Mitigation
  * @param {Object} scores - { founderScore, marketScore, businessModelScore, growthScore, competitionScore, riskScore }
  * @returns {Number|null} - Rounded to 1 decimal place
  */
@@ -56,18 +57,22 @@ const calculateOverallInvestmentScore = (scores = {}) => {
   };
 
   for (const key of Object.keys(validScores)) {
-    if (isNaN(validScores[key]) || validScores[key] < 1 || validScores[key] > 10) {
+    if (isNaN(validScores[key]) || validScores[key] < 0 || validScores[key] > 10) {
       return null;
     }
   }
 
+  // Risk in analysis is the risk penalty level (0 = No Risk, 10 = Max Risk).
+  // Risk Mitigation / Defensibility subscore is (10 - riskScore).
+  const riskMitigation = Math.max(0, 10 - validScores.risk);
+
   const weightedSum =
     (validScores.founder * WEIGHTS.founder) +
     (validScores.market * WEIGHTS.market) +
-    (validScores.businessModel * WEIGHTS.businessModel) +
     (validScores.growth * WEIGHTS.growth) +
+    (validScores.businessModel * WEIGHTS.businessModel) +
     (validScores.competition * WEIGHTS.competition) +
-    (validScores.risk * WEIGHTS.risk);
+    (riskMitigation * WEIGHTS.risk);
 
   return Math.round(weightedSum * 10) / 10;
 };

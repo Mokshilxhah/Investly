@@ -8,6 +8,7 @@ import Comparison from './pages/Comparison';
 import StartupModal from './components/startup/StartupModal';
 import ExcelUploadModal from './components/startup/ExcelUploadModal';
 import IntakeChoiceModal from './components/startup/IntakeChoiceModal';
+import AICopilotDrawer from './components/common/AICopilotDrawer';
 import startupService from './services/startupService';
 
 function AppContent() {
@@ -112,6 +113,9 @@ function AppContent() {
           await loadStats();
         }}
       />
+
+      {/* 🌟 4. Global In-App AI Diligence Copilot */}
+      <AICopilotDrawer />
     </Layout>
   );
 }
