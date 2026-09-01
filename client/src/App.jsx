@@ -17,7 +17,16 @@ function AppContent() {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [stats, setStats] = useState({ totalStartups: 0 });
+  const [stats, setStats] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_dashboard_metrics');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return { totalStartups: parsed.totalStartups || 0 };
+      }
+    } catch (e) {}
+    return { totalStartups: 0 };
+  });
 
   // Load high-level stats for sidebar badge
   const loadStats = async () => {

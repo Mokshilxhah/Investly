@@ -18,8 +18,26 @@ import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
 
 export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
   const navigate = useNavigate();
-  const [startups, setStartups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant Cache Initialization (0ms initial load)
+  const [startups, setStartups] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.warn('Could not read cached startups:', e);
+    }
+    return [];
+  });
+  
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
   const [error, setError] = useState(null);
 
   // Search, Filter & Sort States
@@ -41,9 +59,11 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
   };
 
   // Fetch Startups Function
-  const fetchStartups = useCallback(async () => {
+  const fetchStartups = useCallback(async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground && startups.length === 0) {
+        setLoading(true);
+      }
       setError(null);
 
       const [sortField, sortOrder] = sortBy.split('-');
@@ -57,14 +77,24 @@ export const StartupsList = ({ onOpenAddModal, onOpenExcelModal }) => {
       };
 
       const data = await startupService.getStartups(params);
-      setStartups(data || []);
+      const list = data || [];
+      setStartups(list);
+      
+      // Cache unfiltered list for instant bootstrap
+      if (!search && selectedIndustry === 'ALL' && selectedStage === 'ALL' && list.length > 0) {
+        try {
+          localStorage.setItem('cached_startups_list', JSON.stringify(list));
+        } catch (e) {}
+      }
     } catch (err) {
       console.error('Error fetching startups:', err);
-      setError(err.message || 'Failed to load startups.');
+      if (startups.length === 0) {
+        setError(err.message || 'Failed to load startups.');
+      }
     } finally {
       setLoading(false);
     }
-  }, [search, selectedIndustry, selectedStage, sortBy]);
+  }, [search, selectedIndustry, selectedStage, sortBy, startups.length]);
 
   useEffect(() => {
     fetchStartups();

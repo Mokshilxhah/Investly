@@ -34,16 +34,37 @@ app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
 
-// Serve Frontend in Production
-if (process.env.NODE_ENV === 'production') {
-  const path = require('path');
-  app.use(express.static(path.join(__dirname, '../client/dist')));
+// Serve Frontend in Production (if dist bundle exists)
+const fs = require('fs');
+const path = require('path');
+const distPath = path.resolve(__dirname, '../client/dist');
+const indexHtmlPath = path.join(distPath, 'index.html');
+
+if (fs.existsSync(indexHtmlPath)) {
+  app.use(express.static(distPath));
   app.get('*', (req, res, next) => {
     if (req.url.startsWith('/api')) {
       return next();
     }
-    res.sendFile(path.resolve(__dirname, '../client/dist', 'index.html'));
+    res.sendFile(indexHtmlPath);
   });
+} else {
+  // Backend API mode (when client is hosted on Vercel)
+  app.get('/', (req, res) => {
+    res.status(200).json({
+      success: true,
+      message: 'Investly API Server is running smoothly.',
+      frontendApp: 'https://investly-three.vercel.app',
+      health: '/api/health',
+      endpoints: {
+        dashboard: '/api/dashboard',
+        startups: '/api/startups',
+        pipeline: '/api/startups/pipeline',
+      },
+    });
+  });
+
+  app.get('/favicon.ico', (req, res) => res.status(204).end());
 }
 
 // Error Handling Middleware

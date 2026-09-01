@@ -22,33 +22,59 @@ import { PageLoader } from '../components/common/Loader';
 
 export const Dashboard = ({ onOpenAddModal }) => {
   const navigate = useNavigate();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  
+  // Instant Cache Initialization (0ms initial load)
+  const [data, setData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_dashboard_metrics');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {
+      console.warn('Could not read cached dashboard metrics:', e);
+    }
+    return null;
+  });
+  
+  const [loading, setLoading] = useState(() => {
+    try {
+      return !localStorage.getItem('cached_dashboard_metrics');
+    } catch (e) {
+      return true;
+    }
+  });
   const [error, setError] = useState(null);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground && !data) {
+        setLoading(true);
+      }
       setError(null);
       const res = await startupService.getDashboardMetrics();
-      setData(res);
+      if (res) {
+        setData(res);
+        try {
+          localStorage.setItem('cached_dashboard_metrics', JSON.stringify(res));
+        } catch (e) {}
+      }
     } catch (err) {
       console.error('Error fetching dashboard metrics:', err);
-      setError(err.message || 'Could not load data');
+      if (!data) {
+        setError(err.message || 'Could not load data');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchDashboardData();
+    fetchDashboardData(Boolean(data));
 
-    const handleCreated = () => fetchDashboardData();
+    const handleCreated = () => fetchDashboardData(true);
     window.addEventListener('startup-created', handleCreated);
     return () => window.removeEventListener('startup-created', handleCreated);
   }, []);
 
-  if (loading) return <PageLoader />;
+  if (loading && !data) return <PageLoader text="Loading your dashboard..." />;
 
   if (error || !data) {
     return (

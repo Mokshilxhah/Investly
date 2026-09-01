@@ -15,12 +15,41 @@ export const Spinner = ({ size = 'md', className = '' }) => {
   );
 };
 
-export const PageLoader = () => (
-  <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-3">
-    <Spinner size="lg" />
-    <span className="text-xs font-bold font-display text-slate-500">Loading...</span>
-  </div>
-);
+export const PageLoader = ({ text = 'Loading...' }) => {
+  const [seconds, setSeconds] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  let statusText = text;
+  if (seconds >= 2 && seconds < 5) {
+    statusText = 'Connecting to cloud database...';
+  } else if (seconds >= 5) {
+    statusText = 'Waking up live backend (Render free tier may take ~30s on first load)...';
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 px-4 text-center">
+      <div className="relative">
+        <Spinner size="lg" />
+      </div>
+      <div className="space-y-1 max-w-sm">
+        <span className="text-xs font-bold font-display text-slate-700 block transition-all">
+          {statusText}
+        </span>
+        {seconds >= 5 && (
+          <p className="text-[11px] text-slate-400 font-medium animate-pulse">
+            Please hang tight, data will appear as soon as the server wakes up!
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const CardSkeleton = () => (
   <div className="bg-white rounded-[24px] p-5 shadow-xs border border-slate-200/80 animate-pulse space-y-4">

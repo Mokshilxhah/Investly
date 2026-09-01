@@ -36,9 +36,44 @@ const CORE_5_QUALITIES = [
 
 export const Comparison = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [allStartups, setAllStartups] = useState([]);
-  const [selectedIds, setSelectedIds] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [allStartups, setAllStartups] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return [];
+  });
+  const [selectedIds, setSelectedIds] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      if (cached) {
+        const list = JSON.parse(cached);
+        const filteredList = list.filter(
+          (s) => s.decision?.status === 'INVEST' || s.decision?.status === 'WATCHLIST'
+        );
+        const queryIds = searchParams.get('ids');
+        if (queryIds) {
+          return queryIds
+            .split(',')
+            .filter((id) => filteredList.some((s) => s._id === id))
+            .slice(0, 3);
+        } else if (filteredList.length >= 2) {
+          return [filteredList[0]._id, filteredList[1]._id];
+        } else if (filteredList.length > 0) {
+          return [filteredList[0]._id];
+        }
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
 
   // Filter ONLY startups with decision category INVEST or WATCHLIST
   const eligibleStartups = useMemo(() => {
@@ -51,10 +86,17 @@ export const Comparison = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
+        if (allStartups.length === 0) {
+          setLoading(true);
+        }
         const data = await startupService.getStartups();
         const list = data || [];
         setAllStartups(list);
+        if (list.length > 0) {
+          try {
+            localStorage.setItem('cached_startups_list', JSON.stringify(list));
+          } catch (e) {}
+        }
 
         // Filter list to only INVEST and WATCHLIST
         const filteredList = list.filter(
@@ -68,10 +110,10 @@ export const Comparison = () => {
             .filter((id) => filteredList.some((s) => s._id === id))
             .slice(0, 3); // Max 3 startups
           setSelectedIds(ids);
-        } else if (filteredList.length >= 2) {
+        } else if (filteredList.length >= 2 && selectedIds.length === 0) {
           // Pre-select top 2 from eligible list
           setSelectedIds([filteredList[0]._id, filteredList[1]._id]);
-        } else if (filteredList.length > 0) {
+        } else if (filteredList.length > 0 && selectedIds.length === 0) {
           setSelectedIds([filteredList[0]._id]);
         }
       } catch (err) {

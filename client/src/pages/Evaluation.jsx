@@ -123,9 +123,35 @@ export const Evaluation = () => {
   // Main Tab Switcher: 'founder' | 'analytics' | 'summary'
   const [activeTab, setActiveTab] = useState('founder');
 
-  const [startups, setStartups] = useState([]);
-  const [selectedStartup, setSelectedStartup] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [startups, setStartups] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return [];
+  });
+  const [selectedStartup, setSelectedStartup] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      if (cached) {
+        const list = JSON.parse(cached);
+        if (startupId) {
+          const found = list.find((s) => s._id === startupId);
+          if (found) return found;
+        }
+        return list[0] || null;
+      }
+    } catch (e) {}
+    return null;
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('cached_startups_list');
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
   const [saving, setSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
@@ -205,14 +231,28 @@ export const Evaluation = () => {
     setAnalyticsScores((prev) => ({ ...prev, riskScore: autoCalculatedRiskScore }));
   }, [autoCalculatedRiskScore]);
 
-  // Load Startups
+  // Load initial clean startup if selected initially from cache
+  useEffect(() => {
+    if (selectedStartup) {
+      loadCleanStartupData(selectedStartup);
+    }
+  }, []);
+
+  // Load Startups (Background Revalidation)
   useEffect(() => {
     const fetchStartups = async () => {
       try {
-        setLoading(true);
+        if (!selectedStartup) {
+          setLoading(true);
+        }
         const data = await startupService.getStartups();
         const list = data || [];
         setStartups(list);
+        if (list.length > 0) {
+          try {
+            localStorage.setItem('cached_startups_list', JSON.stringify(list));
+          } catch (e) {}
+        }
 
         if (startupId) {
           const found = list.find((s) => s._id === startupId);
