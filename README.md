@@ -92,8 +92,10 @@ Nothing is faked — every number on screen comes from a real database call.
 - 📊 **Analyze the business** — market size, growth, competition, risks
 - 🚦 **Watch it move through the pipeline** — see exactly which stage every startup is in
 - 🏛️ **Make the final call** — Invest, Watchlist, or Reject, with a comment explaining why
-- 🔲 **Compare startups side-by-side** — pick up to 3 and see how they stack up
+- 🔲 **Compare startups side-by-side** — pick up to 3 and see how they stack up with an All-Rounder pick
 - 📈 **Check the dashboard** — live counts, top opportunities, recent activity
+- 🤖 **Ask the AI Diligence Assistant** — icon button in the sidebar with live portfolio Q&A and comparisons
+- 📥 **Export pipeline to CSV** — 1-click button on Startups list to download your dataset into a spreadsheet
 
 <br/>
 
@@ -132,6 +134,8 @@ Investly/
 | Pipeline stages that actually gate progress | ✅ |
 | Live dashboard | ✅ |
 | Compare startups | ✅ |
+| AI Diligence Assistant | ✅ |
+| Export pipeline to CSV | ✅ |
 
 <br/>
 
