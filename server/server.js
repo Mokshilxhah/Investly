@@ -6,6 +6,7 @@ const { connectDB } = require('./config/db');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
 
 const startupRoutes = require('./routes/startupRoutes');
+const pipelineRoutes = require('./routes/pipelineRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 
@@ -29,6 +30,7 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/startups', startupRoutes);
+app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/chat', chatRoutes);
 
