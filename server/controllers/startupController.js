@@ -740,6 +740,25 @@ const bulkCreateStartups = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Seed or reset sample venture startups
+ * @route   POST /api/startups/seed
+ */
+const seedDemoDatabase = async (req, res, next) => {
+  try {
+    const { seedStartupsData } = require('../seed/seedData');
+    const { clearExisting } = req.body || {};
+    await seedStartupsData(clearExisting !== false);
+
+    res.status(200).json({
+      success: true,
+      message: 'Database seeded with 8 mature venture startups successfully',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getStartups,
   getStartupById,
@@ -753,4 +772,5 @@ module.exports = {
   getPipeline,
   getBottleneckStats,
   bulkCreateStartups,
+  seedDemoDatabase,
 };

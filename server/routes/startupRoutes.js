@@ -13,11 +13,15 @@ const {
   advanceStage,
   getPipeline,
   getBottleneckStats,
+  seedDemoDatabase,
 } = require('../controllers/startupController');
 const {
   validateStartupPayload,
   sanitizeClientScoreInput,
 } = require('../middleware/validateRequest');
+
+router.route('/seed')
+  .post(seedDemoDatabase);
 
 router.route('/bulk')
   .post(bulkCreateStartups);

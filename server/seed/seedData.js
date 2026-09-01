@@ -331,32 +331,19 @@ const seedStartups = [
   },
 ];
 
-const seedDB = async () => {
-  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/startup_intelligence';
-  console.log(`[Seed] Connecting to MongoDB: ${uri}`);
-
-  let mongoMemoryServer = null;
-  try {
-    await mongoose.connect(uri, { serverSelectionTimeoutMS: 2500 });
-  } catch (err) {
-    console.warn(`[Seed] Direct connect failed (${err.message}). Using In-Memory MongoDB...`);
-    const { MongoMemoryServer } = require('mongodb-memory-server');
-    mongoMemoryServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoMemoryServer.getUri());
+const seedStartupsData = async (clearExisting = false) => {
+  if (clearExisting) {
+    console.log('[Seed] Clearing existing startups...');
+    await Startup.deleteMany({});
   }
-
-  console.log('[Seed] Clearing existing startups...');
-  await Startup.deleteMany({});
 
   console.log(`[Seed] Inserting ${seedStartups.length} startups with precomputed scores...`);
 
   for (const startupData of seedStartups) {
-    // Compute founder score
     const founderScore = calculateFounderScore(startupData.evaluation);
     startupData.evaluation.overallScore = founderScore;
     startupData.evaluation.updatedAt = new Date();
 
-    // Compute scorecard
     const scores = {
       founderScore,
       marketScore: startupData.analysis.marketScore,
@@ -391,6 +378,24 @@ const seedDB = async () => {
   }
 
   console.log('✅ [Seed] Successfully seeded startup data!');
+};
+
+const seedDB = async () => {
+  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/startup_intelligence';
+  console.log(`[Seed] Connecting to MongoDB: ${uri}`);
+
+  let mongoMemoryServer = null;
+  try {
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 2500 });
+  } catch (err) {
+    console.warn(`[Seed] Direct connect failed (${err.message}). Using In-Memory MongoDB...`);
+    const { MongoMemoryServer } = require('mongodb-memory-server');
+    mongoMemoryServer = await MongoMemoryServer.create();
+    await mongoose.connect(mongoMemoryServer.getUri());
+  }
+
+  await seedStartupsData(true);
+
   await mongoose.connection.close();
   if (mongoMemoryServer) await mongoMemoryServer.stop();
   process.exit(0);
@@ -403,4 +408,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { seedStartups };
+module.exports = { seedStartups, seedStartupsData };

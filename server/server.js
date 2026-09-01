@@ -56,6 +56,20 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await connectDB();
+
+    // Auto-bootstrap sample startups if database is currently empty
+    try {
+      const Startup = require('./models/Startup');
+      const { seedStartupsData } = require('./seed/seedData');
+      const count = await Startup.countDocuments();
+      if (count === 0) {
+        console.log('[Auto-Seed] Database is empty. Bootstrapping initial venture startups...');
+        await seedStartupsData(false);
+      }
+    } catch (seedErr) {
+      console.warn('[Auto-Seed] Note on auto-seed:', seedErr.message);
+    }
+
     app.listen(PORT, () => {
       console.log(`=========================================`);
       console.log(`🚀 Server running on port ${PORT}`);
