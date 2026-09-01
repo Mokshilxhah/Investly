@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   User,
@@ -92,8 +92,9 @@ const MOAT_DROPDOWN_OPTIONS = [
 ];
 
 export const Evaluation = () => {
+  const { id: paramId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const startupId = searchParams.get('id');
+  const startupId = paramId || searchParams.get('id');
 
   // Main Tab Switcher: 'founder' | 'analytics' | 'summary'
   const [activeTab, setActiveTab] = useState('founder');
@@ -247,41 +248,43 @@ export const Evaluation = () => {
     }
 
     setStarRatings({
-      domainExpertise: 0,
-      execution: 0,
-      vision: 0,
-      technicalMastery: 0,
-      teamStrength: 0,
+      domainExpertise: startup.evaluation?.domainExpertise ? Math.round(startup.evaluation.domainExpertise / 2) : 0,
+      execution: startup.evaluation?.execution ? Math.round(startup.evaluation.execution / 2) : 0,
+      vision: startup.evaluation?.vision ? Math.round(startup.evaluation.vision / 2) : 0,
+      technicalMastery: startup.evaluation?.experience ? Math.round(startup.evaluation.experience / 2) : 0,
+      teamStrength: startup.evaluation?.teamStrength ? Math.round(startup.evaluation.teamStrength / 2) : 0,
     });
     setRoundsList([]);
     setQualitiesTodoList(INITIAL_QUALITIES_TODO.map((t) => ({ ...t, done: false })));
-    setMeetingNotes('');
+    setMeetingNotes(startup.evaluation?.meetingNotes || '');
 
     setAnalyticsScores({
-      marketScore: 0,
-      businessModelScore: 0,
-      growthScore: 0,
-      competitionScore: 0,
-      riskScore: 1.0,
+      marketScore: startup.analysis?.marketScore || 0,
+      businessModelScore: startup.analysis?.businessModelScore || 0,
+      growthScore: startup.analysis?.growthScore || 0,
+      competitionScore: startup.analysis?.competitionScore || 0,
+      riskScore: startup.analysis?.riskScore !== undefined && startup.analysis?.riskScore !== null ? startup.analysis.riskScore : 1.0,
     });
 
     setAnalyticsData({
-      marketOpportunity: '',
-      businessModel: '',
-      revenue: '',
-      growthPotential: '',
-      competitiveLandscape: '',
-      keyRisks: '',
-      investmentThesis: '',
+      marketOpportunity: startup.analysis?.marketOpportunity || '',
+      businessModel: startup.analysis?.businessModel || '',
+      revenue: startup.analysis?.revenue || '',
+      growthPotential: startup.analysis?.growthPotential || '',
+      competitiveLandscape: startup.analysis?.competitiveLandscape || '',
+      keyRisks: startup.analysis?.keyRisks || '',
+      investmentThesis: startup.analysis?.investmentThesis || startup.decision?.comment || '',
     });
 
-    setRiskCategories({
-      founderRisk: 'LOW',
-      marketRisk: 'LOW',
-      executionRisk: 'LOW',
-      financialRisk: 'LOW',
-      competitiveRisk: 'LOW',
-    });
+    setRiskCategories(
+      startup.analysis?.riskCategories || {
+        founderRisk: 'LOW',
+        marketRisk: 'LOW',
+        executionRisk: 'LOW',
+        financialRisk: 'LOW',
+        competitiveRisk: 'LOW',
+      }
+    );
   };
 
   const handleSelectStartup = (id) => {
@@ -613,8 +616,8 @@ export const Evaluation = () => {
         domainExpertise: (starRatings.domainExpertise || 0) * 2,
         execution: (starRatings.execution || 0) * 2,
         vision: (starRatings.vision || 0) * 2,
-        teamStrength: (starRatings.technicalMastery || 0) * 2,
-        experience: (starRatings.teamStrength || 0) * 2,
+        experience: (starRatings.technicalMastery || 0) * 2,
+        teamStrength: (starRatings.teamStrength || 0) * 2,
         overallScore: calculatedOverallScore,
         meetingNotes: meetingNotes.trim(),
       };

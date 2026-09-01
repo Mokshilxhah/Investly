@@ -1,103 +1,67 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ExternalLink,
-  Edit2,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
-  User,
-  BarChart3,
-  ListTodo,
-  Sparkles,
-  Plus,
-  X,
-  Check,
-  Building2,
-  Calendar,
-  MapPin,
-  TrendingUp,
-  Award,
-} from 'lucide-react';
-import startupService from '../services/startupService';
-import { StageBadge, IndustryBadge, DecisionBadge } from '../components/common/Badge';
-import StartupModal from '../components/startup/StartupModal';
-import DeleteConfirmModal from '../components/common/DeleteConfirmModal';
-import { PageLoader, Spinner } from '../components/common/Loader';
-
-const FOUNDER_QUALITIES = [
-  'Domain Expertise',
-  'Execution Velocity',
-  'Vision & Clarity',
-  'Technical Mastery',
-  'Team Leadership',
-  'Transparency & Integrity',
-];
+import { useParams, useNavigate, Link } from 'react-router-dom';
 
 export const StartupDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (id) {
+      navigate(`/evaluation?id=${id}`, { replace: true });
+    } else {
+      navigate('/evaluation', { replace: true });
+    }
+  }, [id, navigate]);
+
+  return null;
+};
+
+const LegacyOldStartupDetail = () => {
   const [startup, setStartup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState(null);
-
-  // 2 Primary Evaluation Options / Tabs
-  const [activeTab, setActiveTab] = useState('founder'); // 'founder' | 'analytics'
-
-  // Modals
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-
-  // OPTION 1: FOUNDER MEETING EVALUATION
+  const [activeTab, setActiveTab] = useState('founder');
+  
+  // Form States
   const [founderScore, setFounderScore] = useState(7);
-  const [meetingExperience, setMeetingExperience] = useState('');
-  const [selectedQualities, setSelectedQualities] = useState([
-    'Domain Expertise',
-    'Execution Velocity',
-  ]);
-  const [founderTodoInput, setFounderTodoInput] = useState('');
-  const [founderTodos, setFounderTodos] = useState([
-    { id: 1, text: 'Check 2 previous investor/co-worker references', done: false },
-  ]);
-
-  // OPTION 2: ANALYTICS & INVESTMENT ANALYSIS
   const [analyticsScore, setAnalyticsScore] = useState(7);
+  const [meetingExperience, setMeetingExperience] = useState('');
+  const [selectedQualities, setSelectedQualities] = useState([]);
   const [marketOpportunity, setMarketOpportunity] = useState('');
   const [businessModel, setBusinessModel] = useState('');
   const [growthTraction, setGrowthTraction] = useState('');
   const [defensibilityMoat, setDefensibilityMoat] = useState('');
   const [investmentThesis, setInvestmentThesis] = useState('');
-  const [analyticsTodoInput, setAnalyticsTodoInput] = useState('');
-  const [analyticsTodos, setAnalyticsTodos] = useState([
-    { id: 2, text: 'Verify customer cohort retention & payback data', done: false },
-  ]);
   const [decisionStatus, setDecisionStatus] = useState('UNDER_EVALUATION');
   const [decisionComment, setDecisionComment] = useState('');
 
-  const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => setToastMessage(null), 3500);
+  // To-Do States
+  const [founderTodos, setFounderTodos] = useState([]);
+  const [founderTodoInput, setFounderTodoInput] = useState('');
+  const [analyticsTodos, setAnalyticsTodos] = useState([]);
+  const [analyticsTodoInput, setAnalyticsTodoInput] = useState('');
+
+  const [saving, setSaving] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (message) => {
+    setToastMessage({ message });
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const fetchStartup = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const data = await startupService.getStartupById(id);
+      const res = await startupService.getById(id);
+      const data = res.data;
       setStartup(data);
 
       // Populate Founder Data
-      if (data.evaluation?.overallScore) {
-        setFounderScore(data.evaluation.overallScore);
-      } else if (data.evaluation?.experience) {
-        setFounderScore(data.evaluation.experience);
-      }
-      if (data.founder?.background) {
+      if (data.evaluation) {
+        setFounderScore(data.evaluation.experience || 7);
         setMeetingExperience(data.founder.background);
       }
 

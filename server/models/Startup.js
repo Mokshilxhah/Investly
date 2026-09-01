@@ -217,7 +217,11 @@ const StartupSchema = new mongoose.Schema({
   },
   pipelineStage: {
     type: String,
-    enum: ['Discovered', 'Screening', 'Deep Dive', 'Committee', 'Closed'],
+    enum: [
+      'Discovered', 'Screening', 'Deep Dive', 'Committee', 'Closed',
+      'DISCOVERED', 'UNDER_REVIEW', 'SCREENING', 'DEEP_DIVE', 'EVALUATION', 'COMMITTEE', 'CLOSED',
+      'discovered', 'screening', 'deep dive', 'committee', 'closed'
+    ],
     default: 'Discovered',
     set: function(val) {
       if (!val) return 'Discovered';
@@ -237,6 +241,18 @@ const StartupSchema = new mongoose.Schema({
   },
 }, {
   timestamps: true,
+});
+
+StartupSchema.pre('save', function(next) {
+  if (this.pipelineStage) {
+    const clean = this.pipelineStage.toString().trim().toUpperCase();
+    if (clean === 'DISCOVERED') this.pipelineStage = 'Discovered';
+    else if (clean === 'UNDER_REVIEW' || clean === 'SCREENING') this.pipelineStage = 'Screening';
+    else if (clean === 'EVALUATION' || clean === 'DEEP DIVE' || clean === 'DEEP_DIVE') this.pipelineStage = 'Deep Dive';
+    else if (clean === 'COMMITTEE') this.pipelineStage = 'Committee';
+    else if (clean === 'CLOSED') this.pipelineStage = 'Closed';
+  }
+  next();
 });
 
 // Text index for full-text search capability

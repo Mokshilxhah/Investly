@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'r
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import StartupsList from './pages/StartupsList';
-import StartupDetail from './pages/StartupDetail';
 import Evaluation from './pages/Evaluation';
 import Comparison from './pages/Comparison';
 import StartupModal from './components/startup/StartupModal';
@@ -79,11 +78,12 @@ function AppContent() {
             />
           }
         />
-        <Route path="/startups/:id" element={<StartupDetail />} />
+        <Route path="/startups/:id" element={<Evaluation />} />
         <Route path="/evaluation" element={<Evaluation />} />
         <Route path="/evaluate" element={<Evaluation />} />
         <Route path="/scoring" element={<Evaluation />} />
         <Route path="/compare" element={<Comparison />} />
+        <Route path="/comparison" element={<Comparison />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

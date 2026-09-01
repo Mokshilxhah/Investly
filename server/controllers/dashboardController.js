@@ -47,14 +47,15 @@ const getDashboardMetrics = async (req, res, next) => {
       { id: 'Closed', label: 'Closed', count: closedCount },
     ];
 
-    // Top Investment Opportunities: ONLY startups evaluated with score >= 8.0
+    // Top Investment Opportunities: High-conviction deals (Score >= 8.0 or INVEST decision)
     const topOpportunities = await Startup.find({
       $or: [
         { 'scorecard.overallInvestmentScore': { $gte: 8.0 } },
+        { 'decision.status': 'INVEST' },
         { 'evaluation.overallScore': { $gte: 8.0 } },
       ],
     })
-      .sort({ 'scorecard.overallInvestmentScore': -1, 'evaluation.overallScore': -1 })
+      .sort({ 'scorecard.overallInvestmentScore': -1, 'evaluation.overallScore': -1, updatedAt: -1 })
       .limit(6)
       .select('companyName industry stage scorecard evaluation decision pipelineStage');
 

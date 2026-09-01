@@ -12,6 +12,9 @@ import {
   BarChart2,
   Layers,
   Plus,
+  Target,
+  Award,
+  Sparkles,
 } from 'lucide-react';
 import startupService from '../services/startupService';
 import { StageBadge, IndustryBadge, DecisionBadge } from '../components/common/Badge';
@@ -228,23 +231,27 @@ export const Dashboard = ({ onOpenAddModal }) => {
 
             {/* List of Startup Cards */}
             {topOpportunities.length === 0 ? (
-              <div className="py-12 text-center space-y-3 bg-[#f8faf8] rounded-2xl border border-slate-200/70 p-6">
-                <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center mx-auto shadow-2xs border border-slate-200">
-                  <TrendingUp className="w-5 h-5" />
+              <div className="py-10 px-6 text-center space-y-3.5 bg-[#f8faf8] rounded-2xl border border-dashed border-slate-200">
+                <div className="w-12 h-12 rounded-2xl bg-white text-slate-700 flex items-center justify-center mx-auto shadow-xs border border-slate-200/80">
+                  <Award className="w-6 h-6 text-emerald-600" />
                 </div>
-                <div>
-                  <h4 className="text-sm font-bold font-display text-slate-800">No 8.0+ Evaluated Startups Yet</h4>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-sm mx-auto">
-                    Startups evaluated with an overall score of 8.0 or higher will appear here automatically.
+                <div className="space-y-1">
+                  <h4 className="text-sm font-extrabold font-display text-slate-900">
+                    No High-Conviction Deals Yet
+                  </h4>
+                  <p className="text-xs text-slate-500 font-display font-medium max-w-sm mx-auto leading-relaxed">
+                    Startups evaluated with high conviction (Score ≥ 8.0 / 10 or approved for investment) will automatically appear here.
                   </p>
                 </div>
-                <Link
-                  to="/evaluation"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9df5a9] text-slate-950 text-xs font-black font-display hover:bg-[#8ee59a] transition-colors shadow-xs"
-                >
-                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                  <span>Go to Evaluation Studio</span>
-                </Link>
+                <div className="pt-1 flex items-center justify-center gap-2">
+                  <Link
+                    to="/evaluation"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#191919] hover:bg-slate-900 text-[#9df5a9] text-xs font-black font-display shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Target className="w-3.5 h-3.5 text-[#9df5a9]" />
+                    <span>Open Evaluation Studio</span>
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
@@ -258,7 +265,7 @@ export const Dashboard = ({ onOpenAddModal }) => {
                   return (
                     <Link
                       key={startup._id}
-                      to={`/startups/${startup._id}`}
+                      to={`/evaluation?id=${startup._id}`}
                       className="p-4 rounded-2xl bg-[#f4f7f4] hover:bg-[#eaf1ea] border border-slate-200/60 transition-all cursor-pointer flex items-center justify-between gap-4 group block"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">

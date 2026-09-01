@@ -97,13 +97,6 @@ export const StartupModal = ({
       if (!formData.location.trim()) {
         newErrors.location = 'Location is required';
       }
-      if (
-        formData.website &&
-        !formData.website.startsWith('http://') &&
-        !formData.website.startsWith('https://')
-      ) {
-        newErrors.website = 'Must start with http:// or https://';
-      }
     } else if (step === 2) {
       if (!formData.founderName.trim()) {
         newErrors.founderName = 'Founder name is required';
@@ -128,10 +121,7 @@ export const StartupModal = ({
         formData.companyName.trim() !== '' &&
         formData.industry !== '' &&
         formData.stage !== '' &&
-        formData.location.trim() !== '' &&
-        (!formData.website ||
-          formData.website.startsWith('http://') ||
-          formData.website.startsWith('https://'))
+        formData.location.trim() !== ''
       );
     }
     if (currentStep === 2) {
@@ -202,6 +192,11 @@ export const StartupModal = ({
       return;
     }
 
+    let cleanWebsite = formData.website.trim();
+    if (cleanWebsite && !cleanWebsite.startsWith('http://') && !cleanWebsite.startsWith('https://')) {
+      cleanWebsite = `https://${cleanWebsite}`;
+    }
+
     const payload = {
       companyName: formData.companyName.trim(),
       industry: formData.industry,
@@ -210,7 +205,7 @@ export const StartupModal = ({
         name: formData.founderName.trim(),
         background: formData.founderBackground.trim(),
       },
-      website: formData.website.trim(),
+      website: cleanWebsite,
       location: formData.location.trim(),
       description: formData.description.trim(),
       pipelineStage: formData.pipelineStage,

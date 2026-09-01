@@ -195,17 +195,44 @@ const createStartup = async (req, res, next) => {
   try {
     const { companyName, industry, stage, founder, website, location, description } = req.body;
 
+    if (!companyName || !companyName.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Company name is required',
+      });
+    }
+
+    const cleanName = companyName.trim();
+
+    // Prevent duplicate entries (case-insensitive)
+    const existing = await Startup.findOne({
+      companyName: { $regex: new RegExp(`^${cleanName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: `A startup named "${cleanName}" already exists. Duplicate entries are not allowed.`,
+      });
+    }
+
+    // Normalize website URL if provided
+    let cleanWebsite = (website || '').trim();
+    if (cleanWebsite && !cleanWebsite.startsWith('http://') && !cleanWebsite.startsWith('https://')) {
+      cleanWebsite = `https://${cleanWebsite}`;
+    }
+
     const startup = new Startup({
-      companyName,
-      industry,
+      companyName: cleanName,
+      industry: industry || 'Fintech',
       stage: stage || 'Seed',
       founder: {
-        name: founder?.name,
-        background: founder?.background || '',
+        name: founder?.name?.trim() || 'Founding Team',
+        background: founder?.background?.trim() || '',
       },
-      website: website || '',
-      location: location || '',
-      description: description || '',
+      website: cleanWebsite,
+      location: location?.trim() || '',
+      description: description?.trim() || '',
       pipelineStage: 'Discovered',
       stageHistory: [{ stage: 'Discovered', enteredAt: new Date(), exitedAt: null }],
     });
@@ -649,12 +676,34 @@ const bulkCreateStartups = async (req, res, next) => {
     const createdList = [];
     const errors = [];
 
+    // Fetch existing startup names from DB to prevent duplicate records
+    const existingStartups = await Startup.find({}, 'companyName').lean();
+    const existingNames = new Set(
+      existingStartups.map((s) => s.companyName.trim().toLowerCase())
+    );
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       try {
         if (!item.companyName || !item.companyName.trim()) {
           errors.push({ row: i + 1, message: 'Company name is required' });
           continue;
+        }
+
+        const nameKey = item.companyName.trim().toLowerCase();
+        if (existingNames.has(nameKey)) {
+          errors.push({
+            row: i + 1,
+            companyName: item.companyName.trim(),
+            message: `Startup "${item.companyName.trim()}" already exists. Skipped duplicate.`,
+          });
+          continue;
+        }
+        existingNames.add(nameKey);
+
+        let cleanWebsite = (item.website || '').trim();
+        if (cleanWebsite && !cleanWebsite.startsWith('http://') && !cleanWebsite.startsWith('https://')) {
+          cleanWebsite = `https://${cleanWebsite}`;
         }
 
         const newStartup = new Startup({
@@ -665,7 +714,7 @@ const bulkCreateStartups = async (req, res, next) => {
             name: item.founder?.name || item.founderName || 'Founding Team',
             background: item.founder?.background || item.founderBackground || '',
           },
-          website: item.website || '',
+          website: cleanWebsite,
           location: item.location || '',
           description: item.description || '',
           pipelineStage: 'Discovered',
