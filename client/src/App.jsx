@@ -4,6 +4,8 @@ import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import StartupsList from './pages/StartupsList';
 import StartupDetail from './pages/StartupDetail';
+import Evaluation from './pages/Evaluation';
+import Comparison from './pages/Comparison';
 import StartupModal from './components/startup/StartupModal';
 import ExcelUploadModal from './components/startup/ExcelUploadModal';
 import IntakeChoiceModal from './components/startup/IntakeChoiceModal';
@@ -45,9 +47,8 @@ function AppContent() {
       await loadStats();
       window.dispatchEvent(new CustomEvent('startup-created'));
 
-      // Redirect straight into Startup Detail workspace for the new record
       if (created?._id) {
-        navigate(`/startups/${created._id}`);
+        navigate(`/evaluation?id=${created._id}`);
       }
     } catch (err) {
       console.error('Error creating startup:', err);
@@ -79,11 +80,15 @@ function AppContent() {
           }
         />
         <Route path="/startups/:id" element={<StartupDetail />} />
+        <Route path="/evaluation" element={<Evaluation />} />
+        <Route path="/evaluate" element={<Evaluation />} />
+        <Route path="/scoring" element={<Evaluation />} />
+        <Route path="/compare" element={<Comparison />} />
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* 1. Intake Choice Modal (Choose Manual vs Upload Directly) */}
+      {/* 1. Intake Choice Modal */}
       <IntakeChoiceModal
         isOpen={isChoiceModalOpen}
         onClose={() => setIsChoiceModalOpen(false)}

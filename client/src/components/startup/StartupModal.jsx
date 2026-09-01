@@ -52,7 +52,7 @@ export const StartupModal = ({
     founderName: '',
     founderBackground: '',
     description: '',
-    pipelineStage: 'DISCOVERED',
+    pipelineStage: 'Discovered',
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -69,7 +69,7 @@ export const StartupModal = ({
         founderName: startup.founder?.name || '',
         founderBackground: startup.founder?.background || '',
         description: startup.description || '',
-        pipelineStage: startup.pipelineStage || 'DISCOVERED',
+        pipelineStage: startup.pipelineStage || 'Discovered',
       });
     } else {
       setFormData(initialFormState);
@@ -480,31 +480,7 @@ export const StartupModal = ({
                   )}
                 </div>
 
-                {/* Pipeline Stage Chips */}
-                <div>
-                  <label className="block text-xs font-bold font-display text-slate-800 mb-1.5">
-                    Initial Pipeline Status
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PIPELINE_STAGES.map((pstg) => {
-                      const isSelected = formData.pipelineStage === pstg.id;
-                      return (
-                        <button
-                          key={pstg.id}
-                          type="button"
-                          onClick={() => handleSelectField('pipelineStage', pstg.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-display font-bold transition-all ${
-                            isSelected
-                              ? 'bg-[#191919] text-white shadow-xs'
-                              : 'bg-[#f4f7f4] text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          {pstg.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+
 
                 {/* 🔍 Clickable / Editable Review Summary Box */}
                 <div className="p-3.5 rounded-2xl bg-[#f4f7f4] border border-slate-200/80 space-y-2 text-xs">

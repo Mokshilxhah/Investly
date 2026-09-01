@@ -5,6 +5,11 @@ const {
   getSystemRecommendation,
   generateDecisionExplanation,
 } = require('../utils/scoring');
+const {
+  canAdvance,
+  applyRiskVeto,
+  PIPELINE_STAGES,
+} = require('../utils/pipelineGate');
 
 /**
  * Helper to recalculate scorecard and decision engine recommendation for a startup.
@@ -18,14 +23,21 @@ const recalculateScorecard = (startup) => {
   const growthScore = analysis.growthScore;
   const competitionScore = analysis.competitionScore;
   const riskScore = analysis.riskScore;
+  const riskCategories = analysis.riskCategories || {};
 
   if (
     founderScore !== undefined &&
+    founderScore !== null &&
     marketScore !== undefined &&
+    marketScore !== null &&
     businessModelScore !== undefined &&
+    businessModelScore !== null &&
     growthScore !== undefined &&
+    growthScore !== null &&
     competitionScore !== undefined &&
-    riskScore !== undefined
+    competitionScore !== null &&
+    riskScore !== undefined &&
+    riskScore !== null
   ) {
     const scores = {
       founderScore,
@@ -37,11 +49,24 @@ const recalculateScorecard = (startup) => {
     };
 
     const overallInvestmentScore = calculateOverallInvestmentScore(scores);
-    const systemRecommendation = getSystemRecommendation(overallInvestmentScore);
+    let systemRecommendation = getSystemRecommendation(overallInvestmentScore);
     const { strengths, concerns, confidence } = generateDecisionExplanation({
       ...scores,
       overallInvestmentScore,
     });
+
+    // Check risk veto engine
+    const veto = applyRiskVeto(overallInvestmentScore, riskCategories);
+    let riskVetoTriggered = false;
+    let riskVetoReason = '';
+
+    if (veto.vetoTriggered) {
+      riskVetoTriggered = true;
+      riskVetoReason = veto.reason;
+      if (veto.recommendation) {
+        systemRecommendation = veto.recommendation;
+      }
+    }
 
     startup.scorecard = {
       founderScore,
@@ -55,6 +80,8 @@ const recalculateScorecard = (startup) => {
       strengths,
       concerns,
       confidence,
+      riskVetoTriggered,
+      riskVetoReason,
     };
   }
 };
@@ -70,6 +97,7 @@ const getStartups = async (req, res, next) => {
       industry,
       stage,
       decision,
+      pipelineStage,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = req.query;
@@ -96,6 +124,10 @@ const getStartups = async (req, res, next) => {
 
     if (stage && stage !== 'ALL') {
       query.stage = stage.trim();
+    }
+
+    if (pipelineStage && pipelineStage !== 'ALL') {
+      query.pipelineStage = pipelineStage.trim();
     }
 
     if (decision && decision !== 'ALL') {
@@ -133,7 +165,6 @@ const getStartups = async (req, res, next) => {
 const getStartupById = async (req, res, next) => {
   try {
     const startup = await Startup.findById(req.params.id);
-
     if (!startup) {
       return res.status(404).json({
         success: false,
@@ -141,9 +172,15 @@ const getStartupById = async (req, res, next) => {
       });
     }
 
+    // Calculate gate check info dynamically
+    const gateInfo = canAdvance(startup);
+
     res.status(200).json({
       success: true,
-      data: startup,
+      data: {
+        ...startup.toObject(),
+        gateInfo,
+      },
     });
   } catch (err) {
     next(err);
@@ -151,45 +188,34 @@ const getStartupById = async (req, res, next) => {
 };
 
 /**
- * @desc    Create new startup profile
+ * @desc    Create new startup
  * @route   POST /api/startups
  */
 const createStartup = async (req, res, next) => {
   try {
-    const {
-      companyName,
-      industry,
-      stage,
-      founder,
-      website,
-      location,
-      description,
-      pipelineStage,
-    } = req.body;
+    const { companyName, industry, stage, founder, website, location, description } = req.body;
 
-    const startup = await Startup.create({
+    const startup = new Startup({
       companyName,
       industry,
       stage: stage || 'Seed',
       founder: {
-        name: founder.name,
-        background: founder.background || '',
+        name: founder?.name,
+        background: founder?.background || '',
       },
       website: website || '',
       location: location || '',
       description: description || '',
-      pipelineStage: pipelineStage || 'DISCOVERED',
-      decision: {
-        status: 'UNDER_EVALUATION',
-        comment: '',
-        decidedBy: 'Investment Analyst',
-      },
+      pipelineStage: 'Discovered',
+      stageHistory: [{ stage: 'Discovered', enteredAt: new Date(), exitedAt: null }],
     });
+
+    const savedStartup = await startup.save();
 
     res.status(201).json({
       success: true,
-      message: 'Startup profile created successfully',
-      data: startup,
+      message: 'Startup registered successfully',
+      data: savedStartup,
     });
   } catch (err) {
     next(err);
@@ -197,24 +223,14 @@ const createStartup = async (req, res, next) => {
 };
 
 /**
- * @desc    Update startup profile details
+ * @desc    Update startup profile
  * @route   PUT /api/startups/:id
  */
 const updateStartup = async (req, res, next) => {
   try {
-    const {
-      companyName,
-      industry,
-      stage,
-      founder,
-      website,
-      location,
-      description,
-      pipelineStage,
-    } = req.body;
+    const { companyName, industry, stage, founder, website, location, description } = req.body;
 
     const startup = await Startup.findById(req.params.id);
-
     if (!startup) {
       return res.status(404).json({
         success: false,
@@ -225,20 +241,17 @@ const updateStartup = async (req, res, next) => {
     if (companyName) startup.companyName = companyName;
     if (industry) startup.industry = industry;
     if (stage) startup.stage = stage;
-    if (founder && founder.name) {
-      startup.founder.name = founder.name;
-      if (founder.background !== undefined) startup.founder.background = founder.background;
-    }
+    if (founder?.name) startup.founder.name = founder.name;
+    if (founder?.background !== undefined) startup.founder.background = founder.background;
     if (website !== undefined) startup.website = website;
     if (location !== undefined) startup.location = location;
     if (description !== undefined) startup.description = description;
-    if (pipelineStage) startup.pipelineStage = pipelineStage;
 
     const updatedStartup = await startup.save();
 
     res.status(200).json({
       success: true,
-      message: 'Startup updated successfully',
+      message: 'Startup profile updated successfully',
       data: updatedStartup,
     });
   } catch (err) {
@@ -247,13 +260,12 @@ const updateStartup = async (req, res, next) => {
 };
 
 /**
- * @desc    Delete startup profile
+ * @desc    Delete startup
  * @route   DELETE /api/startups/:id
  */
 const deleteStartup = async (req, res, next) => {
   try {
     const startup = await Startup.findById(req.params.id);
-
     if (!startup) {
       return res.status(404).json({
         success: false,
@@ -265,7 +277,7 @@ const deleteStartup = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: `Startup '${startup.companyName}' deleted successfully`,
+      message: 'Startup deleted successfully',
       data: { id: req.params.id },
     });
   } catch (err) {
@@ -274,12 +286,12 @@ const deleteStartup = async (req, res, next) => {
 };
 
 /**
- * @desc    Update founder evaluation scores (auto-computes overall founder score server-side)
+ * @desc    Update founder evaluation & auto-calculate overall founder score
  * @route   PUT /api/startups/:id/evaluation
  */
 const updateEvaluation = async (req, res, next) => {
   try {
-    const { experience, domainExpertise, execution, vision, teamStrength } = req.body;
+    const { experience, domainExpertise, execution, vision, teamStrength, overallScore: clientOverallScore, meetingNotes, notes } = req.body;
 
     const startup = await Startup.findById(req.params.id);
     if (!startup) {
@@ -289,7 +301,7 @@ const updateEvaluation = async (req, res, next) => {
       });
     }
 
-    const overallScore = calculateFounderScore({
+    let calculatedScore = calculateFounderScore({
       experience,
       domainExpertise,
       execution,
@@ -297,31 +309,38 @@ const updateEvaluation = async (req, res, next) => {
       teamStrength,
     });
 
-    if (overallScore === null) {
-      return res.status(400).json({
-        success: false,
-        message: 'All 5 evaluation criteria must be valid numbers between 1 and 10',
-      });
-    }
+    let finalOverallScore = (clientOverallScore !== undefined && clientOverallScore !== null && !isNaN(Number(clientOverallScore)))
+      ? Math.max(0, Math.min(10, Math.round(Number(clientOverallScore) * 10) / 10))
+      : (calculatedScore !== null ? calculatedScore : 0);
 
     startup.evaluation = {
-      experience: Number(experience),
-      domainExpertise: Number(domainExpertise),
-      execution: Number(execution),
-      vision: Number(vision),
-      teamStrength: Number(teamStrength),
-      overallScore,
+      experience: experience !== undefined && !isNaN(Number(experience)) ? Math.max(0, Math.min(10, Number(experience))) : finalOverallScore,
+      domainExpertise: domainExpertise !== undefined && !isNaN(Number(domainExpertise)) ? Math.max(0, Math.min(10, Number(domainExpertise))) : finalOverallScore,
+      execution: execution !== undefined && !isNaN(Number(execution)) ? Math.max(0, Math.min(10, Number(execution))) : finalOverallScore,
+      vision: vision !== undefined && !isNaN(Number(vision)) ? Math.max(0, Math.min(10, Number(vision))) : finalOverallScore,
+      teamStrength: teamStrength !== undefined && !isNaN(Number(teamStrength)) ? Math.max(0, Math.min(10, Number(teamStrength))) : finalOverallScore,
+      overallScore: finalOverallScore,
       updatedAt: new Date(),
     };
+
+    if (!startup.founder) startup.founder = { name: 'Founder', background: '' };
+    if (!startup.founder.name) startup.founder.name = 'Founder';
+    if (meetingNotes !== undefined || notes !== undefined) {
+      startup.founder.background = (meetingNotes !== undefined ? meetingNotes : notes || '').trim();
+    }
 
     recalculateScorecard(startup);
 
     const updated = await startup.save();
+    const gateInfo = canAdvance(updated);
 
     res.status(200).json({
       success: true,
       message: 'Founder evaluation recorded and overall score computed successfully',
-      data: updated,
+      data: {
+        ...updated.toObject(),
+        gateInfo,
+      },
     });
   } catch (err) {
     next(err);
@@ -354,33 +373,50 @@ const updateAnalysis = async (req, res, next) => {
       growthScore,
       keyRisks,
       riskScore,
+      riskCategories,
       investmentThesis,
     } = req.body;
 
+    const validRiskCategories = {
+      founderRisk: ['LOW', 'MEDIUM', 'HIGH'].includes(riskCategories?.founderRisk) ? riskCategories.founderRisk : 'LOW',
+      marketRisk: ['LOW', 'MEDIUM', 'HIGH'].includes(riskCategories?.marketRisk) ? riskCategories.marketRisk : 'LOW',
+      executionRisk: ['LOW', 'MEDIUM', 'HIGH'].includes(riskCategories?.executionRisk) ? riskCategories.executionRisk : 'LOW',
+      financialRisk: ['LOW', 'MEDIUM', 'HIGH'].includes(riskCategories?.financialRisk) ? riskCategories.financialRisk : 'LOW',
+      competitiveRisk: ['LOW', 'MEDIUM', 'HIGH'].includes(riskCategories?.competitiveRisk) ? riskCategories.competitiveRisk : 'LOW',
+    };
+
     startup.analysis = {
       marketOpportunity: marketOpportunity || '',
-      marketScore: marketScore !== undefined ? Number(marketScore) : undefined,
+      marketScore: marketScore !== undefined && !isNaN(Number(marketScore)) ? Math.max(0, Math.min(10, Number(marketScore))) : 0,
       businessModel: businessModel || '',
-      businessModelScore: businessModelScore !== undefined ? Number(businessModelScore) : undefined,
+      businessModelScore: businessModelScore !== undefined && !isNaN(Number(businessModelScore)) ? Math.max(0, Math.min(10, Number(businessModelScore))) : 0,
       competitiveLandscape: competitiveLandscape || '',
-      competitionScore: competitionScore !== undefined ? Number(competitionScore) : undefined,
+      competitionScore: competitionScore !== undefined && !isNaN(Number(competitionScore)) ? Math.max(0, Math.min(10, Number(competitionScore))) : 0,
       revenue: revenue || '',
       growthPotential: growthPotential || '',
-      growthScore: growthScore !== undefined ? Number(growthScore) : undefined,
+      growthScore: growthScore !== undefined && !isNaN(Number(growthScore)) ? Math.max(0, Math.min(10, Number(growthScore))) : 0,
       keyRisks: keyRisks || '',
-      riskScore: riskScore !== undefined ? Number(riskScore) : undefined,
+      riskScore: riskScore !== undefined && !isNaN(Number(riskScore)) ? Math.max(0, Math.min(10, Number(riskScore))) : 0,
+      riskCategories: validRiskCategories,
       investmentThesis: investmentThesis || '',
       updatedAt: new Date(),
     };
 
+    if (!startup.founder) startup.founder = { name: 'Founder', background: '' };
+    if (!startup.founder.name) startup.founder.name = 'Founder';
+
     recalculateScorecard(startup);
 
     const updated = await startup.save();
+    const gateInfo = canAdvance(updated);
 
     res.status(200).json({
       success: true,
       message: 'Investment analysis updated successfully',
-      data: updated,
+      data: {
+        ...updated.toObject(),
+        gateInfo,
+      },
     });
   } catch (err) {
     next(err);
@@ -411,19 +447,184 @@ const updateDecision = async (req, res, next) => {
       });
     }
 
+    const systemRec = startup.scorecard?.systemRecommendation || 'PENDING';
+    const overrideOccurred =
+      systemRec !== 'PENDING' && status !== 'UNDER_EVALUATION' && status !== systemRec;
+
     startup.decision = {
       status,
       comment: comment || '',
       decidedBy: decidedBy || 'Investment Analyst',
       decidedAt: new Date(),
+      overrideOccurred,
     };
 
+    // If final decision is made and startup is in Committee, advance to Closed
+    if (status !== 'UNDER_EVALUATION' && startup.pipelineStage === 'Committee') {
+      const now = new Date();
+      if (startup.stageHistory && startup.stageHistory.length > 0) {
+        startup.stageHistory[startup.stageHistory.length - 1].exitedAt = now;
+      }
+      startup.pipelineStage = 'Closed';
+      startup.stageHistory.push({
+        stage: 'Closed',
+        enteredAt: now,
+        exitedAt: null,
+      });
+    }
+
     const updated = await startup.save();
+    const gateInfo = canAdvance(updated);
 
     res.status(200).json({
       success: true,
       message: `Decision updated to ${status}`,
-      data: updated,
+      data: {
+        ...updated.toObject(),
+        gateInfo,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Advance startup to next pipeline stage
+ * @route   POST /api/startups/:id/advance-stage
+ */
+const advanceStage = async (req, res, next) => {
+  try {
+    const startup = await Startup.findById(req.params.id);
+    if (!startup) {
+      return res.status(404).json({
+        success: false,
+        message: `Startup not found with ID ${req.params.id}`,
+      });
+    }
+
+    const gate = canAdvance(startup);
+    if (!gate.allowed) {
+      return res.status(400).json({
+        success: false,
+        message: gate.reason,
+        weakestDimension: gate.weakestDimension,
+      });
+    }
+
+    const newStage = gate.nextStage;
+    const now = new Date();
+
+    // Close out previous stage history
+    if (startup.stageHistory && startup.stageHistory.length > 0) {
+      startup.stageHistory[startup.stageHistory.length - 1].exitedAt = now;
+    }
+
+    startup.pipelineStage = newStage;
+    startup.stageHistory.push({
+      stage: newStage,
+      enteredAt: now,
+      exitedAt: null,
+    });
+
+    const updated = await startup.save();
+    const newGateInfo = canAdvance(updated);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully advanced to ${newStage}`,
+      data: {
+        ...updated.toObject(),
+        gateInfo: newGateInfo,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Get full pipeline Kanban board grouping
+ * @route   GET /api/pipeline
+ */
+const getPipeline = async (req, res, next) => {
+  try {
+    const startups = await Startup.find({}).sort({ updatedAt: -1 });
+
+    const pipeline = {
+      Discovered: [],
+      Screening: [],
+      'Deep Dive': [],
+      Committee: [],
+      Closed: [],
+    };
+
+    startups.forEach((s) => {
+      const stage = s.pipelineStage || 'Discovered';
+      if (pipeline[stage]) {
+        pipeline[stage].push(s);
+      } else {
+        pipeline.Discovered.push(s);
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: pipeline,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Get pipeline bottleneck statistics & average dwell time
+ * @route   GET /api/pipeline/bottleneck
+ */
+const getBottleneckStats = async (req, res, next) => {
+  try {
+    const stageCounts = await Startup.aggregate([
+      { $match: { pipelineStage: { $ne: 'Closed' } } },
+      { $group: { _id: '$pipelineStage', count: { $sum: 1 } } },
+    ]);
+
+    // Average time spent in each stage
+    const avgDwellTime = await Startup.aggregate([
+      { $unwind: '$stageHistory' },
+      { $match: { 'stageHistory.exitedAt': { $ne: null } } },
+      {
+        $project: {
+          stage: '$stageHistory.stage',
+          durationDays: {
+            $divide: [
+              { $subtract: ['$stageHistory.exitedAt', '$stageHistory.enteredAt'] },
+              1000 * 60 * 60 * 24,
+            ],
+          },
+        },
+      },
+      { $group: { _id: '$stage', avgDays: { $avg: '$durationDays' } } },
+    ]);
+
+    // Find bottleneck stage (most active startups)
+    let bottleneckStage = null;
+    let maxCount = -1;
+
+    stageCounts.forEach((sc) => {
+      if (sc.count > maxCount) {
+        maxCount = sc.count;
+        bottleneckStage = sc._id;
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stageCounts,
+        avgDwellTime,
+        bottleneckStage,
+        activeStartupsInBottleneck: maxCount,
+      },
     });
   } catch (err) {
     next(err);
@@ -433,70 +634,57 @@ const updateDecision = async (req, res, next) => {
 /**
  * @desc    Bulk create startups from Excel/CSV import
  * @route   POST /api/startups/bulk
- * @access  Public
  */
 const bulkCreateStartups = async (req, res, next) => {
   try {
     const { startups: items } = req.body;
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No startups data provided for bulk import',
+        message: 'No startup items provided for bulk upload',
       });
     }
 
-    const created = [];
-    const failed = [];
+    const createdList = [];
+    const errors = [];
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       try {
-        if (!item.companyName || !item.founder?.name) {
-          failed.push({
-            row: i + 1,
-            companyName: item.companyName || 'Row ' + (i + 1),
-            reason: 'Missing required company name or founder name',
-          });
+        if (!item.companyName || !item.companyName.trim()) {
+          errors.push({ row: i + 1, message: 'Company name is required' });
           continue;
         }
 
         const newStartup = new Startup({
           companyName: item.companyName.trim(),
-          industry: item.industry || 'Fintech',
+          industry: item.industry || 'Technology',
           stage: item.stage || 'Seed',
           founder: {
-            name: item.founder.name.trim(),
-            background: item.founder.background ? item.founder.background.trim() : 'Track record not specified',
+            name: item.founder?.name || item.founderName || 'Founding Team',
+            background: item.founder?.background || item.founderBackground || '',
           },
-          website: item.website ? item.website.trim() : undefined,
-          location: item.location ? item.location.trim() : 'Location not specified',
-          description: item.description ? item.description.trim() : 'Imported startup profile',
-          pipelineStage: item.pipelineStage || 'DISCOVERED',
-          decision: {
-            status: item.decisionStatus || 'UNDER_EVALUATION',
-            comment: 'Imported via Bulk Upload',
-            decidedAt: new Date(),
-          },
+          website: item.website || '',
+          location: item.location || '',
+          description: item.description || '',
+          pipelineStage: 'Discovered',
+          stageHistory: [{ stage: 'Discovered', enteredAt: new Date(), exitedAt: null }],
         });
 
         const saved = await newStartup.save();
-        created.push(saved);
+        createdList.push(saved);
       } catch (err) {
-        failed.push({
-          row: i + 1,
-          companyName: item.companyName || 'Row ' + (i + 1),
-          reason: err.message,
-        });
+        errors.push({ row: i + 1, message: err.message });
       }
     }
 
     res.status(201).json({
       success: true,
-      message: `Successfully imported ${created.length} startups`,
-      importedCount: created.length,
-      failedCount: failed.length,
-      data: created,
-      failed,
+      message: `Successfully created ${createdList.length} startups from spreadsheet`,
+      count: createdList.length,
+      errors: errors.length > 0 ? errors : undefined,
+      data: createdList,
     });
   } catch (err) {
     next(err);
@@ -507,11 +695,13 @@ module.exports = {
   getStartups,
   getStartupById,
   createStartup,
-  bulkCreateStartups,
   updateStartup,
   deleteStartup,
   updateEvaluation,
   updateAnalysis,
   updateDecision,
+  advanceStage,
+  getPipeline,
+  getBottleneckStats,
+  bulkCreateStartups,
 };
-

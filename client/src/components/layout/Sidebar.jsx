@@ -6,6 +6,7 @@ import {
   GitCompare,
   Plus,
   TrendingUp,
+  Target,
 } from 'lucide-react';
 
 export const Sidebar = ({ onOpenAddModal, stats = {} }) => {
@@ -22,6 +23,11 @@ export const Sidebar = ({ onOpenAddModal, stats = {} }) => {
       path: '/startups',
       icon: Building2,
       badge: stats.totalStartups ? `${stats.totalStartups}` : null,
+    },
+    {
+      name: 'Evaluation',
+      path: '/evaluation',
+      icon: Target,
     },
     {
       name: 'Comparison',

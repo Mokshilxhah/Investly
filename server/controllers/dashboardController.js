@@ -7,23 +7,25 @@ const Startup = require('../models/Startup');
 const getDashboardMetrics = async (req, res, next) => {
   try {
     const totalStartups = await Startup.countDocuments();
-    const underEvaluation = await Startup.countDocuments({ 'decision.status': 'UNDER_EVALUATION' });
+    const underEvaluation = await Startup.countDocuments({
+      'decision.status': 'UNDER_EVALUATION',
+    });
     const invested = await Startup.countDocuments({ 'decision.status': 'INVEST' });
     const watchlist = await Startup.countDocuments({ 'decision.status': 'WATCHLIST' });
     const rejected = await Startup.countDocuments({ 'decision.status': 'REJECT' });
 
-    // Dynamic aggregation for Average Founder Score
+    // Dynamic aggregation for Average Founder Score (only counts evaluated startups with score > 0)
     const avgFounderResult = await Startup.aggregate([
-      { $match: { 'evaluation.overallScore': { $exists: true, $ne: null } } },
+      { $match: { 'evaluation.overallScore': { $exists: true, $ne: null, $gt: 0 } } },
       { $group: { _id: null, avg: { $avg: '$evaluation.overallScore' } } },
     ]);
     const avgFounderScore = avgFounderResult.length > 0
       ? Math.round(avgFounderResult[0].avg * 10) / 10
       : 0;
 
-    // Dynamic aggregation for Average Overall Investment Score
+    // Dynamic aggregation for Average Overall Investment Score (only counts evaluated startups with score > 0)
     const avgInvestmentResult = await Startup.aggregate([
-      { $match: { 'scorecard.overallInvestmentScore': { $exists: true, $ne: null } } },
+      { $match: { 'scorecard.overallInvestmentScore': { $exists: true, $ne: null, $gt: 0 } } },
       { $group: { _id: null, avg: { $avg: '$scorecard.overallInvestmentScore' } } },
     ]);
     const avgInvestmentScore = avgInvestmentResult.length > 0
@@ -31,30 +33,30 @@ const getDashboardMetrics = async (req, res, next) => {
       : 0;
 
     // Pipeline stage counts
-    const discoveredCount = await Startup.countDocuments({ pipelineStage: 'DISCOVERED', 'decision.status': 'UNDER_EVALUATION' });
-    const underReviewCount = await Startup.countDocuments({ pipelineStage: 'UNDER_REVIEW', 'decision.status': 'UNDER_EVALUATION' });
-    const evaluationCount = await Startup.countDocuments({ pipelineStage: 'EVALUATION', 'decision.status': 'UNDER_EVALUATION' });
-    const committeeCount = await Startup.countDocuments({ pipelineStage: 'COMMITTEE', 'decision.status': 'UNDER_EVALUATION' });
-    const decidedCount = await Startup.countDocuments({ 'decision.status': { $in: ['INVEST', 'WATCHLIST', 'REJECT'] } });
+    const discoveredCount = await Startup.countDocuments({ pipelineStage: 'Discovered' });
+    const screeningCount = await Startup.countDocuments({ pipelineStage: 'Screening' });
+    const deepDiveCount = await Startup.countDocuments({ pipelineStage: 'Deep Dive' });
+    const committeeCount = await Startup.countDocuments({ pipelineStage: 'Committee' });
+    const closedCount = await Startup.countDocuments({ pipelineStage: 'Closed' });
 
     const pipelineStages = [
-      { id: 'discovered', label: 'Discovered', count: discoveredCount },
-      { id: 'under_review', label: 'Under Review', count: underReviewCount },
-      { id: 'evaluation', label: 'Evaluation', count: evaluationCount },
-      { id: 'committee', label: 'Investment Committee', count: committeeCount },
-      { id: 'decided', label: 'Decided', count: decidedCount },
+      { id: 'Discovered', label: 'Discovered', count: discoveredCount },
+      { id: 'Screening', label: 'Screening', count: screeningCount },
+      { id: 'Deep Dive', label: 'Deep Dive', count: deepDiveCount },
+      { id: 'Committee', label: 'Committee', count: committeeCount },
+      { id: 'Closed', label: 'Closed', count: closedCount },
     ];
 
-    // Top Investment Opportunities (Top 5 by overall score, fallback to founder score)
+    // Top Investment Opportunities: ONLY startups evaluated with score >= 8.0
     const topOpportunities = await Startup.find({
       $or: [
-        { 'scorecard.overallInvestmentScore': { $exists: true, $ne: null } },
-        { 'evaluation.overallScore': { $exists: true, $ne: null } }
-      ]
+        { 'scorecard.overallInvestmentScore': { $gte: 8.0 } },
+        { 'evaluation.overallScore': { $gte: 8.0 } },
+      ],
     })
       .sort({ 'scorecard.overallInvestmentScore': -1, 'evaluation.overallScore': -1 })
-      .limit(5)
-      .select('companyName industry stage scorecard evaluation decision');
+      .limit(6)
+      .select('companyName industry stage scorecard evaluation decision pipelineStage');
 
     // Recent Activity / Updates feed
     const recentStartups = await Startup.find()
@@ -64,10 +66,10 @@ const getDashboardMetrics = async (req, res, next) => {
 
     const recentActivity = recentStartups.map((s) => {
       let text = '';
-      let type = 'stage_move'; // default
+      let type = 'stage_move';
 
       if (s.decision?.status === 'INVEST') {
-        text = `${s.companyName} approved for investment ($${s.stage})`;
+        text = `${s.companyName} approved for investment (${s.stage || 'Seed'})`;
         type = 'invest';
       } else if (s.decision?.status === 'WATCHLIST') {
         text = `${s.companyName} added to active watchlist for monitoring`;
@@ -75,14 +77,14 @@ const getDashboardMetrics = async (req, res, next) => {
       } else if (s.decision?.status === 'REJECT') {
         text = `${s.companyName} evaluation finalized: Rejected`;
         type = 'reject';
-      } else if (s.pipelineStage === 'EVALUATION') {
-        text = `${s.companyName} advanced to deep founder & financial evaluation`;
+      } else if (s.pipelineStage === 'Screening') {
+        text = `${s.companyName} advanced to Screening stage`;
         type = 'stage_move';
-      } else if (s.pipelineStage === 'COMMITTEE') {
+      } else if (s.pipelineStage === 'Deep Dive') {
+        text = `${s.companyName} advanced to Deep Dive evaluation`;
+        type = 'stage_move';
+      } else if (s.pipelineStage === 'Committee') {
         text = `${s.companyName} submitted to Investment Committee`;
-        type = 'stage_move';
-      } else if (s.pipelineStage === 'UNDER_REVIEW') {
-        text = `${s.companyName} initial intake review started`;
         type = 'stage_move';
       } else {
         text = `${s.companyName} added to deal sourcing pipeline`;

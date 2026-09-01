@@ -10,6 +10,9 @@ const {
   updateEvaluation,
   updateAnalysis,
   updateDecision,
+  advanceStage,
+  getPipeline,
+  getBottleneckStats,
 } = require('../controllers/startupController');
 const {
   validateStartupPayload,
@@ -19,15 +22,23 @@ const {
 router.route('/bulk')
   .post(bulkCreateStartups);
 
+router.route('/pipeline')
+  .get(getPipeline);
+
+router.route('/pipeline/bottleneck')
+  .get(getBottleneckStats);
+
 router.route('/')
   .get(getStartups)
   .post(validateStartupPayload, sanitizeClientScoreInput, createStartup);
-
 
 router.route('/:id')
   .get(getStartupById)
   .put(validateStartupPayload, sanitizeClientScoreInput, updateStartup)
   .delete(deleteStartup);
+
+router.route('/:id/advance-stage')
+  .post(advanceStage);
 
 router.route('/:id/evaluation')
   .put(updateEvaluation);

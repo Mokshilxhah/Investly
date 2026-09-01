@@ -16,32 +16,32 @@ const FounderSchema = new mongoose.Schema({
 const EvaluationSchema = new mongoose.Schema({
   experience: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   domainExpertise: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   execution: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   vision: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   teamStrength: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   overallScore: {
     type: Number,
-    min: 1,
+    min: 0,
     max: 10,
   },
   updatedAt: {
@@ -49,18 +49,36 @@ const EvaluationSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const RiskCategoriesSchema = new mongoose.Schema({
+  founderRisk: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
+  marketRisk: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
+  executionRisk: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
+  financialRisk: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
+  competitiveRisk: { type: String, enum: ['LOW', 'MEDIUM', 'HIGH'], default: 'LOW' },
+}, { _id: false });
+
 const AnalysisSchema = new mongoose.Schema({
   marketOpportunity: { type: String, default: '' },
-  marketScore: { type: Number, min: 1, max: 10 },
+  marketScore: { type: Number, min: 0, max: 10 },
   businessModel: { type: String, default: '' },
-  businessModelScore: { type: Number, min: 1, max: 10 },
+  businessModelScore: { type: Number, min: 0, max: 10 },
   competitiveLandscape: { type: String, default: '' },
-  competitionScore: { type: Number, min: 1, max: 10 },
+  competitionScore: { type: Number, min: 0, max: 10 },
   revenue: { type: String, default: '' },
   growthPotential: { type: String, default: '' },
-  growthScore: { type: Number, min: 1, max: 10 },
+  growthScore: { type: Number, min: 0, max: 10 },
   keyRisks: { type: String, default: '' },
-  riskScore: { type: Number, min: 1, max: 10 },
+  riskScore: { type: Number, min: 0, max: 10 },
+  riskCategories: {
+    type: RiskCategoriesSchema,
+    default: () => ({
+      founderRisk: 'LOW',
+      marketRisk: 'LOW',
+      executionRisk: 'LOW',
+      financialRisk: 'LOW',
+      competitiveRisk: 'LOW',
+    }),
+  },
   investmentThesis: { type: String, default: '' },
   updatedAt: { type: Date },
 }, { _id: false });
@@ -85,6 +103,8 @@ const ScorecardSchema = new mongoose.Schema({
     enum: ['HIGH', 'MEDIUM', 'LOW', 'PENDING'],
     default: 'PENDING',
   },
+  riskVetoTriggered: { type: Boolean, default: false },
+  riskVetoReason: { type: String, default: '' },
 }, { _id: false });
 
 const DecisionSchema = new mongoose.Schema({
@@ -103,6 +123,25 @@ const DecisionSchema = new mongoose.Schema({
   },
   decidedAt: {
     type: Date,
+  },
+  overrideOccurred: {
+    type: Boolean,
+    default: false,
+  },
+}, { _id: false });
+
+const StageHistorySchema = new mongoose.Schema({
+  stage: {
+    type: String,
+    required: true,
+  },
+  enteredAt: {
+    type: Date,
+    default: Date.now,
+  },
+  exitedAt: {
+    type: Date,
+    default: null,
   },
 }, { _id: false });
 
@@ -163,6 +202,8 @@ const StartupSchema = new mongoose.Schema({
       confidence: 'PENDING',
       strengths: [],
       concerns: [],
+      riskVetoTriggered: false,
+      riskVetoReason: '',
     }),
   },
   decision: {
@@ -171,12 +212,28 @@ const StartupSchema = new mongoose.Schema({
       status: 'UNDER_EVALUATION',
       comment: '',
       decidedBy: 'Investment Analyst',
+      overrideOccurred: false,
     }),
   },
   pipelineStage: {
     type: String,
-    enum: ['DISCOVERED', 'UNDER_REVIEW', 'EVALUATION', 'COMMITTEE', 'CLOSED'],
-    default: 'DISCOVERED',
+    enum: ['Discovered', 'Screening', 'Deep Dive', 'Committee', 'Closed'],
+    default: 'Discovered',
+    set: function(val) {
+      if (!val) return 'Discovered';
+      const clean = val.toString().trim().toUpperCase();
+      if (clean === 'DISCOVERED') return 'Discovered';
+      if (clean === 'UNDER_REVIEW' || clean === 'SCREENING') return 'Screening';
+      if (clean === 'EVALUATION' || clean === 'DEEP DIVE' || clean === 'DEEP_DIVE') return 'Deep Dive';
+      if (clean === 'COMMITTEE') return 'Committee';
+      if (clean === 'CLOSED') return 'Closed';
+      return val;
+    },
+    index: true,
+  },
+  stageHistory: {
+    type: [StageHistorySchema],
+    default: () => ([{ stage: 'Discovered', enteredAt: new Date(), exitedAt: null }]),
   },
 }, {
   timestamps: true,

@@ -271,7 +271,7 @@ export const ExcelUploadModal = ({ isOpen, onClose, onImportSuccess }) => {
         location: resolvedLocation,
         website: formattedWeb,
         description: `${cleanName} — Early-stage innovative solution.`,
-        pipelineStage: 'DISCOVERED',
+        pipelineStage: 'Discovered',
         isValid: true,
       });
     });

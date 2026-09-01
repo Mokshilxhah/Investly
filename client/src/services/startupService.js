@@ -25,7 +25,6 @@ export const startupService = {
     return res.data;
   },
 
-
   // Update existing startup profile
   updateStartup: async (id, startupData) => {
     const res = await api.put(`/startups/${id}`, startupData);
@@ -53,6 +52,24 @@ export const startupService = {
   // Record investment decision
   updateDecision: async (id, decisionData) => {
     const res = await api.put(`/startups/${id}/decision`, decisionData);
+    return res.data;
+  },
+
+  // Advance to next pipeline stage
+  advanceStage: async (id) => {
+    const res = await api.post(`/startups/${id}/advance-stage`);
+    return res.data;
+  },
+
+  // Get full Kanban pipeline grouping
+  getPipeline: async () => {
+    const res = await api.get('/startups/pipeline');
+    return res.data;
+  },
+
+  // Get bottleneck stats
+  getBottleneckStats: async () => {
+    const res = await api.get('/startups/pipeline/bottleneck');
     return res.data;
   },
 

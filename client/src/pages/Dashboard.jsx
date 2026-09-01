@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowUpRight,
   ChevronRight,
@@ -8,14 +8,17 @@ import {
   X,
   Clock,
   Building2,
-  BarChart2,
   TrendingUp,
+  BarChart2,
   Layers,
   Plus,
 } from 'lucide-react';
 import startupService from '../services/startupService';
+import { StageBadge, IndustryBadge, DecisionBadge } from '../components/common/Badge';
+import { PageLoader } from '../components/common/Loader';
 
 export const Dashboard = ({ onOpenAddModal }) => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,28 +40,12 @@ export const Dashboard = ({ onOpenAddModal }) => {
   useEffect(() => {
     fetchDashboardData();
 
-    // Listen for global startup creation events to auto-refresh
     const handleCreated = () => fetchDashboardData();
     window.addEventListener('startup-created', handleCreated);
     return () => window.removeEventListener('startup-created', handleCreated);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-6 animate-pulse w-full min-w-0">
-        <div className="h-10 w-48 bg-white/70 rounded-3xl" />
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-28 bg-white/70 rounded-3xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-7 h-96 bg-white/70 rounded-3xl" />
-          <div className="lg:col-span-5 h-96 bg-white/70 rounded-3xl" />
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <PageLoader />;
 
   if (error || !data) {
     return (
@@ -86,8 +73,8 @@ export const Dashboard = ({ onOpenAddModal }) => {
     rejected = 0,
     avgFounderScore = 0,
     avgInvestmentScore = 0,
-    byIndustry = [],
     topOpportunities = [],
+    recentActivity = [],
   } = data;
 
   const renderStatusTag = (status) => {
@@ -120,12 +107,12 @@ export const Dashboard = ({ onOpenAddModal }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 text-slate-900 w-full min-w-0">
+    <div className="max-w-7xl mx-auto space-y-6 text-slate-900 w-full min-w-0 pb-12">
       {/* 🏷️ 1. PAGE HEADER: Title & Direct Link */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold font-display text-slate-900 tracking-tight">
-            Dashboard
+            Dashboard Overview
           </h1>
         </div>
 
@@ -138,7 +125,7 @@ export const Dashboard = ({ onOpenAddModal }) => {
         </Link>
       </div>
 
-      {/* 📊 2. TOP 5 METRIC CARDS (Always rendered with true numbers) */}
+      {/* 📊 2. TOP 5 METRIC CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {/* Total */}
         <div className="bg-[#191919] text-white rounded-[28px] p-5 shadow-sm flex flex-col justify-between">
@@ -150,16 +137,16 @@ export const Dashboard = ({ onOpenAddModal }) => {
               <Building2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-3xl sm:text-4xl font-black font-display tracking-tight text-white mt-3">
+          <div className="text-3xl sm:text-4xl font-black font-display tracking-tight mt-3">
             {totalStartups}
           </div>
         </div>
 
-        {/* Evaluating */}
+        {/* Under Evaluation */}
         <div className="bg-[#b0a2ff] text-slate-950 rounded-[28px] p-5 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold font-display">
-              Evaluating
+              In Pipeline
             </span>
             <div className="w-8 h-8 rounded-xl bg-white/60 flex items-center justify-center">
               <Clock className="w-4 h-4 stroke-[2.5]" />
@@ -216,7 +203,7 @@ export const Dashboard = ({ onOpenAddModal }) => {
         </div>
       </div>
 
-      {/* 🚀 3. MAIN SECTION: Top Startups (Left) + Portfolio Averages & Industries (Right) */}
+      {/* 🚀 3. MAIN SECTION: Top Startups (Left) + Portfolio Averages (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7 cols): Top Startups Showcase */}
         <div className="lg:col-span-7 bg-white rounded-[32px] p-6 sm:p-7 shadow-sm border border-slate-200/80 flex flex-col justify-between">
@@ -227,7 +214,7 @@ export const Dashboard = ({ onOpenAddModal }) => {
                   <TrendingUp className="w-4 h-4 text-[#9df5a9]" />
                 </div>
                 <h3 className="text-base font-extrabold font-display text-slate-900">
-                  Top Scored Startups
+                  Top Scored Startups (8.0+)
                 </h3>
               </div>
               <Link
@@ -239,32 +226,29 @@ export const Dashboard = ({ onOpenAddModal }) => {
               </Link>
             </div>
 
-            {/* List of Startup Cards or Graceful In-Grid Empty State */}
+            {/* List of Startup Cards */}
             {topOpportunities.length === 0 ? (
-              <div className="py-12 text-center space-y-3 bg-[#f4f7f4] rounded-2xl border border-slate-200/60 p-6">
-                <div className="w-10 h-10 rounded-xl bg-white text-slate-400 flex items-center justify-center mx-auto shadow-xs">
-                  <Building2 className="w-5 h-5" />
+              <div className="py-12 text-center space-y-3 bg-[#f8faf8] rounded-2xl border border-slate-200/70 p-6">
+                <div className="w-10 h-10 rounded-xl bg-white text-emerald-600 flex items-center justify-center mx-auto shadow-2xs border border-slate-200">
+                  <TrendingUp className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold font-display text-slate-800">No Startups Yet</h4>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
-                    Start by creating your first startup profile.
+                  <h4 className="text-sm font-bold font-display text-slate-800">No 8.0+ Evaluated Startups Yet</h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 max-w-sm mx-auto">
+                    Startups evaluated with an overall score of 8.0 or higher will appear here automatically.
                   </p>
                 </div>
-                {onOpenAddModal && (
-                  <button
-                    type="button"
-                    onClick={onOpenAddModal}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black font-display text-slate-950 bg-[#9df5a9] hover:bg-[#8ee59a] transition-all shadow-xs"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>Add Startup</span>
-                  </button>
-                )}
+                <Link
+                  to="/evaluation"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#9df5a9] text-slate-950 text-xs font-black font-display hover:bg-[#8ee59a] transition-colors shadow-xs"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Go to Evaluation Studio</span>
+                </Link>
               </div>
             ) : (
               <div className="space-y-3">
-                {topOpportunities.slice(0, 5).map((startup) => {
+                {topOpportunities.map((startup) => {
                   const score =
                     startup.scorecard?.overallInvestmentScore ??
                     startup.evaluation?.overallScore ??
@@ -274,10 +258,9 @@ export const Dashboard = ({ onOpenAddModal }) => {
                   return (
                     <Link
                       key={startup._id}
-                      to="/startups"
+                      to={`/startups/${startup._id}`}
                       className="p-4 rounded-2xl bg-[#f4f7f4] hover:bg-[#eaf1ea] border border-slate-200/60 transition-all cursor-pointer flex items-center justify-between gap-4 group block"
                     >
-                      {/* Left Info */}
                       <div className="flex items-center gap-3.5 min-w-0">
                         <div className="w-11 h-11 rounded-2xl bg-[#191919] text-white flex items-center justify-center font-black font-display text-sm flex-shrink-0 shadow-xs">
                           {startup.companyName.charAt(0).toUpperCase()}
@@ -292,7 +275,6 @@ export const Dashboard = ({ onOpenAddModal }) => {
                         </div>
                       </div>
 
-                      {/* Right Info */}
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <div className="text-right">
                           <div className="text-base font-black font-display text-slate-950">
@@ -311,89 +293,76 @@ export const Dashboard = ({ onOpenAddModal }) => {
               </div>
             )}
           </div>
-
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-display mt-4">
-            <span className="text-slate-500 font-medium">View all startups in the directory for full profiles.</span>
-          </div>
         </div>
 
-        {/* Right Column (5 cols): Scoring Averages + Industries */}
+        {/* Right Column (5 cols): Portfolio Scoring Averages & Activity */}
         <div className="lg:col-span-5 space-y-6">
-          {/* Average Scores Card */}
-          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/80 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-[#191919] text-white flex items-center justify-center">
-                  <BarChart2 className="w-4 h-4 text-[#9df5a9]" />
-                </div>
-                <h3 className="text-sm font-extrabold font-display text-slate-900">
-                  Portfolio Averages
-                </h3>
+          {/* Average Scores */}
+          <div className="bg-white rounded-[32px] p-6 sm:p-7 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-xl bg-[#191919] text-white flex items-center justify-center">
+                <BarChart2 className="w-4 h-4 text-[#9df5a9]" />
               </div>
-              <span className="text-xs text-slate-500 font-bold font-display">10-point scale</span>
+              <h3 className="text-base font-extrabold font-display text-slate-900">
+                Portfolio Averages
+              </h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-4 rounded-2xl bg-[#9df5a9] text-slate-950 flex flex-col justify-between">
-                <span className="text-xs font-bold font-display">Founder Avg</span>
-                <div className="text-3xl font-black font-display mt-2">
-                  {avgFounderScore.toFixed(1)}
-                  <span className="text-xs font-normal opacity-70">/10</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 rounded-2xl bg-[#f4f7f4] border border-slate-200/60 space-y-1">
+                <div className="text-[11px] font-bold text-slate-500 font-display uppercase tracking-wider">
+                  Founder Average
+                </div>
+                <div className="text-2xl font-black font-display text-slate-900">
+                  {avgFounderScore ? avgFounderScore.toFixed(1) : '0.0'}
+                  <span className="text-xs font-normal text-slate-400 ml-1">/10</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-[#b0a2ff] text-slate-950 flex flex-col justify-between">
-                <span className="text-xs font-bold font-display">Overall Avg</span>
-                <div className="text-3xl font-black font-display mt-2">
-                  {avgInvestmentScore.toFixed(1)}
-                  <span className="text-xs font-normal opacity-70">/10</span>
+              <div className="p-4 rounded-2xl bg-[#191919] text-white space-y-1">
+                <div className="text-[11px] font-bold text-[#9df5a9] font-display uppercase tracking-wider">
+                  Overall Average
+                </div>
+                <div className="text-2xl font-black font-display text-white">
+                  {avgInvestmentScore ? avgInvestmentScore.toFixed(1) : '0.0'}
+                  <span className="text-xs font-normal text-slate-400 ml-1">/10</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Top Industries Card */}
-          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-200/80 space-y-4">
+          {/* Recent Activity */}
+          <div className="bg-white rounded-[32px] p-6 sm:p-7 shadow-sm border border-slate-200/80 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-[#191919] text-white flex items-center justify-center">
-                  <Layers className="w-4 h-4 text-[#9df5a9]" />
+                  <Clock className="w-4 h-4 text-[#9df5a9]" />
                 </div>
-                <h3 className="text-sm font-extrabold font-display text-slate-900">
-                  Industries Breakdown
+                <h3 className="text-base font-extrabold font-display text-slate-900">
+                  Recent Activity
                 </h3>
               </div>
-              <span className="text-xs text-slate-500 font-bold font-display">
-                {byIndustry.length} total
-              </span>
             </div>
 
-            {byIndustry.length === 0 ? (
-              <div className="py-6 text-center text-xs text-slate-400 font-display font-medium bg-[#f4f7f4] rounded-2xl">
-                No industry data recorded yet.
-              </div>
+            {recentActivity.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-6 font-display">
+                No recent activity recorded.
+              </p>
             ) : (
-              <div className="space-y-3">
-                {byIndustry.slice(0, 5).map((item) => {
-                  const percentage = totalStartups > 0 ? Math.round((item.count / totalStartups) * 100) : 0;
-
-                  return (
-                    <div key={item._id} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs font-display">
-                        <span className="font-bold text-slate-800">{item._id}</span>
-                        <span className="font-extrabold text-slate-950">
-                          {item.count} ({percentage}%)
-                        </span>
+              <div className="space-y-3 font-display">
+                {recentActivity.slice(0, 4).map((act, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-3 rounded-2xl bg-[#f8faf8]">
+                    <div className="w-2 h-2 rounded-full bg-[#10b981] mt-1.5 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-900 truncate">
+                        {act.text}
                       </div>
-                      <div className="w-full h-2 bg-[#f4f7f4] rounded-full overflow-hidden border border-slate-100">
-                        <div
-                          className="h-full bg-[#9df5a9] rounded-full transition-all"
-                          style={{ width: `${percentage}%` }}
-                        />
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        {new Date(act.timestamp).toLocaleDateString()}
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>

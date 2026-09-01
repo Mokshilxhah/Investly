@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Building2,
@@ -8,6 +9,7 @@ import {
   Edit2,
   Trash2,
   Globe,
+  Target,
 } from 'lucide-react';
 import { IndustryBadge, StageBadge, DecisionBadge } from '../common/Badge';
 
@@ -18,6 +20,7 @@ export const StartupProfileModal = ({
   onEdit,
   onDelete,
 }) => {
+  const navigate = useNavigate();
   if (!isOpen || !startup) return null;
 
   return (
@@ -122,7 +125,7 @@ export const StartupProfileModal = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => {
@@ -132,20 +135,34 @@ export const StartupProfileModal = ({
             className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-rose-700 font-display transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete Startup</span>
+            <span>Delete</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onEdit(startup);
-            }}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold font-display text-slate-900 bg-[#f4f7f4] hover:bg-slate-200 transition-colors"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-            <span>Edit Details</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onEdit(startup);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold font-display text-slate-900 bg-[#f4f7f4] hover:bg-slate-200 transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate(`/evaluation?id=${startup._id}`);
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black font-display text-slate-950 bg-[#9df5a9] hover:bg-[#8ee59a] transition-colors shadow-xs"
+            >
+              <Target className="w-3.5 h-3.5" />
+              <span>Evaluate Startup</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

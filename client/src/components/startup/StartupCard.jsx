@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ExternalLink,
   MapPin,
@@ -7,10 +8,12 @@ import {
   Trash2,
   ChevronRight,
   Building2,
+  Target,
 } from 'lucide-react';
 import { StageBadge, IndustryBadge } from '../common/Badge';
 
-export const StartupCard = ({ startup, onOpenProfile, onEdit, onDelete }) => {
+export const StartupCard = ({ startup, onOpenProfile, onEdit, onDelete, onEvaluate }) => {
+  const navigate = useNavigate();
   return (
     <div
       onClick={() => onOpenProfile(startup)}
@@ -74,7 +77,7 @@ export const StartupCard = ({ startup, onOpenProfile, onEdit, onDelete }) => {
         </div>
       </div>
 
-      {/* 🛠️ Bottom: CRUD Actions & View Details */}
+      {/* 🛠️ Bottom: CRUD Actions & Evaluate */}
       <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between">
         {/* Inline Edit & Delete Actions */}
         <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -97,11 +100,23 @@ export const StartupCard = ({ startup, onOpenProfile, onEdit, onDelete }) => {
           </button>
         </div>
 
-        {/* View Profile CTA */}
-        <div className="inline-flex items-center gap-1 text-xs font-extrabold font-display text-slate-900 group-hover:text-emerald-700 transition-colors">
-          <span>View Details</span>
-          <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </div>
+        {/* Evaluate CTA Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onEvaluate) {
+              onEvaluate(startup);
+            } else {
+              navigate(`/evaluation?id=${startup._id}`);
+            }
+          }}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black font-display text-slate-950 bg-[#9df5a9] hover:bg-[#8ee59a] transition-colors shadow-xs"
+          title="Evaluate Startup"
+        >
+          <Target className="w-3.5 h-3.5" />
+          <span>Evaluate</span>
+        </button>
       </div>
     </div>
   );
